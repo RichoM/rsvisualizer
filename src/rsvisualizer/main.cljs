@@ -8,6 +8,11 @@
   (go (print "RICHO!")
       (<! (ui/initialize!))))
 
+
+(defn ^:dev/before-load-async reload-begin* [done]
+  (go (<! (ui/terminate!))
+      (done)))
+
 (defn ^:dev/after-load-async reload-end* [done]
   (go (<! (ui/initialize!))
       (done)))
