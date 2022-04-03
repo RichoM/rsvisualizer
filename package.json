@@ -1,0 +1,18 @@
+{
+  "name": "rsvisualizer",
+  "version": "1.0.0",
+  "description": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RichoM/rsvisualizer.git"
+  },
+  "author": "Ricardo Moran",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/RichoM/rsvisualizer/issues"
+  },
+  "homepage": "https://github.com/RichoM/rsvisualizer#readme",
+  "devDependencies": {
+    "shadow-cljs": "^2.17.8"
+  }
+}
