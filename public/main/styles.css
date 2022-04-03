@@ -1,0 +1,17 @@
+body {
+  font-family: 'AlegreyaSansRegular';
+  font-weight: normal;
+  font-style: normal;
+  font-variant: small-caps;
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+}
+
+
+#board-panel {
+  width: 100%;
+  position:absolute;
+  overflow: scroll;
+}
