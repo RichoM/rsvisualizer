@@ -6,6 +6,11 @@
             [utils.pixi :as pixi]
             [utils.core :as u]))
 
+(def ^:const PIXEL_TO_WORLD (/ 1.5 864))
+(defn pixel->world [[x y]]
+  [(* x PIXEL_TO_WORLD)
+   (* y PIXEL_TO_WORLD -1)])
+
 (defonce state (atom {}))
 
 (defn main-container []
@@ -50,7 +55,8 @@
           [:i.fa-solid.fa-arrows-up-down-left-right.me-2]
           "Move"]]]
        [:div.col]]
-      [:div#field-panel]]]]
+      [:div#field-panel
+       [:div#mouse-pos.position-absolute.start-0.top-0.font-monospace]]]]]
     ))
 
 
@@ -91,6 +97,16 @@
                    (oset! :tint 0x00ff00)
                    (pixi/set-position! [0 0])
                    (pixi/add-to! field))]
+        (doto field
+          (oset! :interactive true)
+          (ocall! :on "mousemove"
+               (fn [e] (let [position (ocall! e :data.getLocalPosition field)
+                             [x y] (pixel->world [(oget position :x)
+                                                  (oget position :y)])]
+                         (oset! (js/document.getElementById "mouse-pos")
+                                :innerText (u/format "[%1 %2]" ;x y
+                                                     (.toFixed x 3)
+                                                     (.toFixed y 3)))))))
         (swap! state-atom assoc :pixi
                {:app app
                 :html html
@@ -116,11 +132,20 @@
   (def robots (-> @state :pixi :robots))
   (def ball (-> @state :pixi :ball))
 
+  
+  (js/console.log field)
   (oset! ball :tint 0x00ff00)
 
-  
+  (oget field :parent)
   (def r0 (first robots))
   (pixi/set-position! r0 [-400 0])
   (pixi/set-rotation! r0 1.32)
-  (oset! r0 :tint )
+  (oset! r0 :tint)
+
+  (oget 3.14159 :toFixed)
+  (ocall! 3.14159 "toFixed")
+  (.toFixed 3.14159 3)
+  js/this
+
   )
+  
