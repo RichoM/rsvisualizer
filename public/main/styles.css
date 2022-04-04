@@ -1,5 +1,5 @@
 body {
-  font-family: 'AlegreyaSansRegular';
+  font-family: 'AlegreyaSansRegular', Verdana, sans-serif;
   user-select: none;
   -moz-user-select: none;
   -webkit-user-select: none;
@@ -7,7 +7,7 @@ body {
 }
 
 h3 {
-  font-family: 'DatalegreyaThin';
+  font-family: 'DatalegreyaThin', Verdana, sans-serif;
 }
 
 #side-bar {
