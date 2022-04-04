@@ -77,20 +77,20 @@
       (pixi/set-position! (pixi/get-screen-center app)))))
 
 (defn initialize-pixi! [state-atom]
-  (let [html (js/document.getElementById "field-panel")
-        app (pixi/make-application! html)]
-    (swap! state-atom assoc :pixi
-           {:app app
-            :html html
-            :field (doto (pixi/make-sprite! "imgs/field.png")
-                     (pixi/set-position! (pixi/get-screen-center app))
-                     (pixi/add-to! (oget app :stage)))})
-    (.addEventListener js/window "resize" #(resize-field state-atom))
-    (resize-field state-atom)))
+  (go (let [html (js/document.getElementById "field-panel")
+            app (pixi/make-application! html)]
+        (swap! state-atom assoc :pixi
+               {:app app
+                :html html
+                :field (doto (pixi/make-sprite! (<! (pixi/load-texture! "imgs/field.png")))
+                         (pixi/set-position! (pixi/get-screen-center app))
+                         (pixi/add-to! (oget app :stage)))})
+        (.addEventListener js/window "resize" #(resize-field state-atom))
+        (resize-field state-atom))))
 
 (defn initialize! []
   (go (initialize-main-ui!)
-      (initialize-pixi! state)))
+      (<! (initialize-pixi! state))))
 
 (defn terminate! []
   (go (ocall! (-> @state :pixi :app)
@@ -100,8 +100,26 @@
 
 (comment
   (def app (-> @state :pixi :app))
-  (js/console.log app)
+  (def field (-> @state :pixi :field))
+  (js/console.log field)
   (oget app :screen.width)
 
+  (def mickey (pixi/make-sprite! "imgs/mickey.png"))
+  (oget mickey :width)
+  (oget mickey :texture)
 
+  (let [mickey (pixi/make-sprite! "imgs/mickey.png")]
+    (oget mickey :width))
+
+  (def loader (js/PIXI.Loader.))
+  (ocall! loader :add "imgs/mickey.png")
+  (ocall! loader :load (fn [_ resources]
+                         (js/console.log resources)
+                         #_(let [sprite (js/PIXI.Sprite. (oget resources :mickey :texture))]
+                           (print (oget sprite :width)))))
+
+  (oget loader :resources :mickey)
+  (ocall! loader :add "mickey" "imgs/mickey.png"
+          (fn []
+            (js/console.log (oget loader :resources :mickey))))
   )
