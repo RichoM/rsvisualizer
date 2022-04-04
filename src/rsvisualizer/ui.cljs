@@ -60,35 +60,37 @@
     (oset! :innerHTML "")
     (.appendChild (main-container))))
     
-(defn resize-field [app html]
-  (doto html
-    (oset! :style.height
-           (u/format "calc(100% - %1px)"
-                     (+ 30 (oget (js/document.querySelector "#top-bar")
-                                 :offsetHeight))))
-    (oset! :style.width
-           (u/format "calc(100% - %1px)"
-                     (+ 30 (oget (js/document.querySelector "#side-bar")
-                                 :offsetWidth)))))
-  (ocall! app :resize)
-  (pixi/set-position! (-> @state :pixi :field)
-                      (pixi/get-screen-center app)))
+(defn resize-field [state-atom]
+  (let [{:keys [html app field]} (-> @state-atom :pixi)]
+    (doto html
+      (oset! :style.height
+             (u/format "calc(100% - %1px)"
+                       (+ 30 (oget (js/document.querySelector "#top-bar")
+                                   :offsetHeight))))
+      (oset! :style.width
+             (u/format "calc(100% - %1px)"
+                       (+ 30 (oget (js/document.querySelector "#side-bar")
+                                   :offsetWidth)))))
+    (ocall! app :resize)
+    (doto field
+      (pixi/set-height! (oget app :screen.height))
+      (pixi/set-position! (pixi/get-screen-center app)))))
 
-(defn initialize-pixi! []
+(defn initialize-pixi! [state-atom]
   (let [html (js/document.getElementById "field-panel")
         app (pixi/make-application! html)]
-    (swap! state assoc :pixi
+    (swap! state-atom assoc :pixi
            {:app app
             :html html
             :field (doto (pixi/make-sprite! "imgs/field.png")
                      (pixi/set-position! (pixi/get-screen-center app))
                      (pixi/add-to! (oget app :stage)))})
-    (.addEventListener js/window "resize" #(resize-field app html))
-    (resize-field app html)))
+    (.addEventListener js/window "resize" #(resize-field state-atom))
+    (resize-field state-atom)))
 
 (defn initialize! []
   (go (initialize-main-ui!)
-      (initialize-pixi!)))
+      (initialize-pixi! state)))
 
 (defn terminate! []
   (go (ocall! (-> @state :pixi :app)
