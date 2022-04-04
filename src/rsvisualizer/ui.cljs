@@ -78,13 +78,25 @@
 
 (defn initialize-pixi! [state-atom]
   (go (let [html (js/document.getElementById "field-panel")
-            app (pixi/make-application! html)]
+            app (pixi/make-application! html)
+            field (doto (pixi/make-sprite! (<! (pixi/load-texture! "imgs/field.png")))
+                    (pixi/set-position! (pixi/get-screen-center app))
+                    (pixi/add-to! (oget app :stage)))
+            robots (let [robot-texture (<! (pixi/load-texture! "imgs/robot.png"))]
+                     (vec (repeatedly 3 #(doto (pixi/make-sprite! robot-texture)
+                                           (oset! :tint 0x00aaff)
+                                           (pixi/set-position! [0 0])
+                                           (pixi/add-to! field)))))
+            ball (doto (pixi/make-sprite! (<! (pixi/load-texture! "imgs/ball.png")))
+                   (oset! :tint 0x00ff00)
+                   (pixi/set-position! [0 0])
+                   (pixi/add-to! field))]
         (swap! state-atom assoc :pixi
                {:app app
                 :html html
-                :field (doto (pixi/make-sprite! (<! (pixi/load-texture! "imgs/field.png")))
-                         (pixi/set-position! (pixi/get-screen-center app))
-                         (pixi/add-to! (oget app :stage)))})
+                :field field
+                :robots robots
+                :ball ball})
         (.addEventListener js/window "resize" #(resize-field state-atom))
         (resize-field state-atom))))
 
@@ -101,25 +113,14 @@
 (comment
   (def app (-> @state :pixi :app))
   (def field (-> @state :pixi :field))
-  (js/console.log field)
-  (oget app :screen.width)
+  (def robots (-> @state :pixi :robots))
+  (def ball (-> @state :pixi :ball))
 
-  (def mickey (pixi/make-sprite! "imgs/mickey.png"))
-  (oget mickey :width)
-  (oget mickey :texture)
+  (oset! ball :tint 0x00ff00)
 
-  (let [mickey (pixi/make-sprite! "imgs/mickey.png")]
-    (oget mickey :width))
-
-  (def loader (js/PIXI.Loader.))
-  (ocall! loader :add "imgs/mickey.png")
-  (ocall! loader :load (fn [_ resources]
-                         (js/console.log resources)
-                         #_(let [sprite (js/PIXI.Sprite. (oget resources :mickey :texture))]
-                           (print (oget sprite :width)))))
-
-  (oget loader :resources :mickey)
-  (ocall! loader :add "mickey" "imgs/mickey.png"
-          (fn []
-            (js/console.log (oget loader :resources :mickey))))
+  
+  (def r0 (first robots))
+  (pixi/set-position! r0 [-400 0])
+  (pixi/set-rotation! r0 1.32)
+  (oset! r0 :tint )
   )
