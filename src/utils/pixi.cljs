@@ -51,21 +51,3 @@
     (doto obj
       (oset! :height h)
       (oset! :width w))))
-
-
-(comment
-  
-(go (let [texture (<! (load-image! "imgs/field.png"))
-          sprite (js/PIXI.Sprite. texture)]
-      (print (oget sprite :width))))
-
-  
-  (aget (oget js/PIXI.Loader.shared :resources) "imgs/mickey.png")
-  (oget+ (oget js/PIXI.Loader.shared :resources) "imgs/mickey\\.png")
-  (def loader (js/PIXI.Loader.))
-(ocall! loader :add "imgs/mickey.png")
-(ocall! loader :load (fn [_ resources]
-                       (js/console.log resources)
-                       #_(let [sprite (js/PIXI.Sprite. (oget resources :mickey :texture))]
-                           (print (oget sprite :width)))))
-  )

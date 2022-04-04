@@ -139,20 +139,6 @@
   (def robots (-> @state :pixi :robots))
   (def ball (-> @state :pixi :ball))
 
-  
-  (js/console.log field)
-  (oset! ball :tint 0x00ff00)
-
-  (oget field :parent)
-  (def r0 (first robots))
-  (pixi/set-position! r0 [-400 0])
-  (pixi/set-rotation! r0 1.32)
-  (oset! r0 :tint)
-
-  (oget 3.14159 :toFixed)
-  (ocall! 3.14159 "toFixed")
-  (.toFixed 3.14159 3)
-  js/this
 
   )
   
