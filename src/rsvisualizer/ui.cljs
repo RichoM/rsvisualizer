@@ -7,9 +7,14 @@
             [utils.core :as u]))
 
 (def ^:const PIXEL_TO_WORLD (/ 1.5 864))
+
 (defn pixel->world [[x y]]
   [(* x PIXEL_TO_WORLD)
    (* y PIXEL_TO_WORLD -1)])
+
+(defn world->pixel [[x y]]
+  [(/ x PIXEL_TO_WORLD)
+   (/ y PIXEL_TO_WORLD -1)])
 
 (defonce state (atom {}))
 
@@ -101,12 +106,14 @@
           (oset! :interactive true)
           (ocall! :on "mousemove"
                (fn [e] (let [position (ocall! e :data.getLocalPosition field)
-                             [x y] (pixel->world [(oget position :x)
-                                                  (oget position :y)])]
+                             [px py] [(oget position :x) (oget position :y)]
+                             [wx wy] (pixel->world [px py])]
+                         (pixi/set-position! ball (world->pixel 
+                                                   (pixel->world [px py])))
                          (oset! (js/document.getElementById "mouse-pos")
-                                :innerText (u/format "[%1 %2]" ;x y
-                                                     (.toFixed x 3)
-                                                     (.toFixed y 3)))))))
+                                :innerText (u/format "[%1 %2]"
+                                                     (.toFixed wx 3)
+                                                     (.toFixed wy 3)))))))
         (swap! state-atom assoc :pixi
                {:app app
                 :html html
