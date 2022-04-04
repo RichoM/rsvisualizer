@@ -16,8 +16,6 @@
   [(/ x PIXEL_TO_WORLD)
    (/ y PIXEL_TO_WORLD -1)])
 
-(defonce state (atom {}))
-
 (defn main-container []
   (crate/html
    [:div.container-fluid
@@ -123,21 +121,23 @@
         (.addEventListener js/window "resize" #(resize-field state-atom))
         (resize-field state-atom))))
 
-(defn initialize! []
+(defn initialize! [state-atom]
   (go (initialize-main-ui!)
-      (<! (initialize-pixi! state))))
+      (<! (initialize-pixi! state-atom))))
 
-(defn terminate! []
-  (go (ocall! (-> @state :pixi :app)
+(defn terminate! [state-atom]
+  (go (ocall! (-> @state-atom :pixi :app)
               :destroy true {:children true
                              :texture true
                              :baseTexture true})))
 
 (comment
-  (def app (-> @state :pixi :app))
-  (def field (-> @state :pixi :field))
-  (def robots (-> @state :pixi :robots))
-  (def ball (-> @state :pixi :ball))
+  
+  (let [state @rsvisualizer.main/state]
+    (def app (-> state :pixi :app))
+    (def field (-> state :pixi :field))
+    (def robots (-> state :pixi :robots))
+    (def ball (-> state :pixi :ball)))
 
 
   )
