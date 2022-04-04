@@ -3,6 +3,7 @@
             [cljs.core.async.interop :refer-macros [<p!]]
             [oops.core :refer [oget oset! ocall!]]
             [crate.core :as crate]
+            [utils.pixi :as pixi]
             [utils.core :as u]))
 
 (defonce state (atom {}))
@@ -69,23 +70,21 @@
            (u/format "calc(100% - %1px)"
                      (+ 30 (oget (js/document.querySelector "#side-bar")
                                  :offsetWidth)))))
-  (ocall! app :resize))
+  (ocall! app :resize)
+  (pixi/set-position! (-> @state :pixi :field)
+                      (pixi/get-screen-center app)))
 
 (defn initialize-pixi! []
   (let [html (js/document.getElementById "field-panel")
-        app (js/PIXI.Application. (clj->js {:resizeTo html
-                                            :transparent true}))]
-    (swap! state assoc-in [:pixi :app] app)
-    (ocall! html :appendChild (oget app :view))
-    (.addEventListener js/window :resize #(resize-field app html))
-    (resize-field app html)
-    (let [field-sprite (js/PIXI.Sprite.from "imgs/field.png")]
-      (ocall! (oget app :stage) :addChild field-sprite)
-      (doto field-sprite
-        (oset! :anchor.x 0.5)
-        (oset! :anchor.y 0.5)
-        (oset! :x (/ (oget app :screen.width) 2))
-        (oset! :y (/ (oget app :screen.height) 2))))))
+        app (pixi/make-application! html)]
+    (swap! state assoc :pixi
+           {:app app
+            :html html
+            :field (doto (pixi/make-sprite! "imgs/field.png")
+                     (pixi/set-position! (pixi/get-screen-center app))
+                     (pixi/add-to! (oget app :stage)))})
+    (.addEventListener js/window "resize" #(resize-field app html))
+    (resize-field app html)))
 
 (defn initialize! []
   (go (initialize-main-ui!)
@@ -99,8 +98,8 @@
 
 (comment
   (def app (-> @state :pixi :app))
-
   (js/console.log app)
+  (oget app :screen.width)
 
 
   )
