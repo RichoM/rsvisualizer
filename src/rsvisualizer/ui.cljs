@@ -62,8 +62,7 @@
           [:i.fa-solid.fa-arrows-up-down-left-right.me-2]
           "Move"]]]
        [:div.col]]
-      [:div#field-panel
-       [:div#mouse-pos.position-absolute.start-0.top-0.font-monospace]]]]]
+      [:div#field-panel]]]]
     ))
 
 (defn modal-container []
@@ -96,7 +95,7 @@
                                    :offsetWidth)))))
     (ocall! app :resize)
     (doto field
-      (pixi/set-height! (oget app :screen.height))
+      (pixi/set-height! (- (oget app :screen.height) 15))
       (pixi/set-position! (pixi/get-screen-center app)))))
 
 (defn initialize-pixi! [state-atom]
@@ -110,12 +109,12 @@
                    (pixi/set-position! [0 0])
                    (pixi/add-to! field))
             robots (let [robot-texture (<! (pixi/load-texture! "imgs/robot.png"))
-                         label-style (js/PIXI.TextStyle.  (clj->js {:fontFamily "sans-serif"
-                                                                    :fontSize 26
-                                                                    :fontWeight "bold"
-                                                                    :fill "#ffffff"
-                                                                    :stroke "#000000"
-                                                                    :strokeThickness 4}))]
+                         label-style (js/PIXI.TextStyle. (clj->js {:fontFamily "sans-serif"
+                                                                   :fontSize 26
+                                                                   :fontWeight "bold"
+                                                                   :fill "#ffffff"
+                                                                   :stroke "#000000"
+                                                                   :strokeThickness 4}))]
                      (mapv (fn [idx]
                              (let [add-robot-label! (fn [robot idx]
                                                       (let [label (pixi/make-label! idx label-style)
@@ -135,11 +134,11 @@
                                  (pixi/add-to! field)
                                  (add-robot-label! (inc idx)))))
                            (range 3)))
-            cursor (let [label-style (js/PIXI.TextStyle.  (clj->js {:fontFamily "monospace"
-                                                                    :fontSize 20
-                                                                    :stroke "#ffffff"
-                                                                    :fill "#000000"
-                                                                    :strokeThickness 4}))
+            cursor (let [label-style (js/PIXI.TextStyle. (clj->js {:fontFamily "monospace"
+                                                                   :fontSize 22
+                                                                   :stroke "#ffffff"
+                                                                   :fill "#656565"
+                                                                   :strokeThickness 5}))
                          label (doto (pixi/make-label! "[0 0]" label-style)
                                  (oset! :anchor.x 0.0))]
                      (pixi/add-child! field label)
@@ -157,10 +156,10 @@
                                 (swap! state-atom assoc :selected-robot nil)))
           (ocall! :on "mousemove"
                   (fn [e] (let [position (ocall! e :data.getLocalPosition field)
-                                [px py] [(oget position :x) (oget position :y)]
-                                [wx wy] (pixel->world [px py])]
-                            (swap! state-atom assoc :cursor {:pixel [px py]
-                                                             :world [wx wy]})))))
+                                pixel-coords [(oget position :x) (oget position :y)]
+                                world-coords (pixel->world pixel-coords)]
+                            (swap! state-atom assoc :cursor {:pixel pixel-coords
+                                                             :world world-coords})))))
         (reset! pixi
                 {:app app
                  :html html
@@ -184,23 +183,17 @@
         (when-let [id (get button-ids selected-robot)]
           (ocall! (js/document.getElementById id) :classList.add "active"))))
     (let [{:keys [ball robots]} @pixi]
-        (when-let [[wx wy] (-> new-state :cursor :world)]
-          (oset! (js/document.getElementById "mouse-pos")
-                 :innerText (u/format "[%1 %2]"
-                                      (.toFixed wx 3)
-                                      (.toFixed wy 3))))
-        (when-let [snapshot (-> new-state :latest-snapshot)]
-          ;(js/console.log (clj->js snapshot))
-          (when-let [{:keys [x y stale-time]} (snapshot :ball)]
-            (doto ball
-              (oset! :tint (if (< stale-time 0.1)
-                             0x00ff00
-                             0xaaaaaa))
-              (pixi/set-position! (world->pixel [x y]))))
-          (doseq [[idx {:keys [x y a]}] (map-indexed vector (snapshot :robots))]
-            (doto (nth robots idx)
-              (pixi/set-position! (world->pixel [x y]))
-              (pixi/set-rotation! (* -1 a))))))))
+      (when-let [snapshot (-> new-state :latest-snapshot)]          
+        (when-let [{:keys [x y stale-time]} (snapshot :ball)]
+          (doto ball
+            (oset! :tint (if (< stale-time 0.1)
+                           0x00ff00
+                           0xaaaaaa))
+            (pixi/set-position! (world->pixel [x y]))))
+        (doseq [[idx {:keys [x y a]}] (map-indexed vector (snapshot :robots))]
+          (doto (nth robots idx)
+            (pixi/set-position! (world->pixel [x y]))
+            (pixi/set-rotation! (* -1 a))))))))
 
 (defn start-update-loop [state-atom]
   (reset! updates (a/chan (a/sliding-buffer 1)))
