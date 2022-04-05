@@ -28,19 +28,19 @@
       [:h3.my-1.text-center "RS Visualizer"]
       [:div.row.my-1]
       [:div.d-grid
-       [:button.btn.btn-sm.btn-outline-dark.rounded-pill
+       [:button#r0-button.r-button.btn.btn-sm.btn-outline-dark.rounded-pill
         {:type "button" :data-bs-toggle "button"}
         [:i.fa-solid.fa-cube.me-2]
         "Robot 1"]]
       [:div.row.my-1]
       [:div.d-grid
-       [:button.btn.btn-sm.btn-outline-dark.rounded-pill
+       [:button#r1-button.r-button.btn.btn-sm.btn-outline-dark.rounded-pill
         {:type "button" :data-bs-toggle "button"}
         [:i.fa-solid.fa-cube.me-2]
         "Robot 2"]]
       [:div.row.my-1]
       [:div.d-grid
-       [:button.btn.btn-sm.btn-outline-dark.rounded-pill
+       [:button#r2-button.r-button.btn.btn-sm.btn-outline-dark.rounded-pill
         {:type "button" :data-bs-toggle "button"}
         [:i.fa-solid.fa-cube.me-2]
         "Robot 3"]]
@@ -70,24 +70,18 @@
   (crate/html [:div#modal-dialogs]))
 
 (defn toast-container []
-  (crate/html [:div#toast-container.toast-container.position-absolute.end-0.top-0.p-3
-               ]))
+  (crate/html [:div#toast-container.toast-container.position-absolute.end-0.top-0.p-3]))
 
-
-(comment
-
-  (b/alert "Richo capo!")
-  (b/show-toast (b/make-toast :header "RICHO!"))
-  
-  )
-
-
-(defn initialize-main-ui! []
+(defn initialize-main-ui! [state-atom]
   (doto js/document.body
     (oset! :innerHTML "")
     (.appendChild (main-container))
     (.appendChild (modal-container))
-    (.appendChild (toast-container))))
+    (.appendChild (toast-container)))
+  (let [toggle-selection (fn [new] (fn [old] (if (= old new) nil new)))]
+    (doseq [[idx selector] (map-indexed vector ["r0-button" "r1-button" "r2-button"])]
+      (b/on-click (js/document.getElementById selector)
+                  #(swap! state-atom update :selected-robot (toggle-selection idx))))))
     
 (defn resize-field []
   (when-let [{:keys [html app field]} @pixi]
@@ -112,16 +106,27 @@
                     (pixi/set-position! (pixi/get-screen-center app))
                     (pixi/add-to! (oget app :stage)))
             robots (let [robot-texture (<! (pixi/load-texture! "imgs/robot.png"))]
-                     (vec (repeatedly 3 #(doto (pixi/make-sprite! robot-texture)
-                                           (oset! :tint 0x00aaff)
-                                           (pixi/set-position! [0 0])
-                                           (pixi/add-to! field)))))
+                     (mapv (fn [idx]
+                             (doto (pixi/make-sprite! robot-texture)
+                               (oset! :tint 0x00aaff)
+                               (oset! :interactive true)
+                               (ocall! :on "click" (fn [e] 
+                                                     (js/console.log e)
+                                                     (ocall! e :stopPropagation)
+                                                     (swap! state-atom update :selected-robot
+                                                            #(if (= % idx) nil idx))))
+                               (pixi/set-position! [(* 50 (dec idx)) -50])
+                               (pixi/add-to! field)))
+                           (range 3)))
             ball (doto (pixi/make-sprite! (<! (pixi/load-texture! "imgs/ball.png")))
                    (oset! :tint 0x00ff00)
                    (pixi/set-position! [0 0])
                    (pixi/add-to! field))]
         (doto field
           (oset! :interactive true)
+          (ocall! :on "click" (fn [e] 
+                                (ocall! e :stopPropagation)
+                                (swap! state-atom assoc :selected-robot nil)))
           (ocall! :on "mousemove"
                   (fn [e] (let [position (ocall! e :data.getLocalPosition field)
                                 [px py] [(oget position :x) (oget position :y)]
@@ -137,15 +142,25 @@
         (.addEventListener js/window "resize" resize-field)
         (resize-field))))
 
-(defn update-ui [state]
+
+
+(defn update-ui [old-state new-state]
   (go 
+    (when (not= (-> old-state :selected-robot)
+                (-> new-state :selected-robot))
+      (let [selected-robot (-> new-state :selected-robot)
+            button-ids ["r0-button" "r1-button" "r2-button"]]
+        (doseq [btn (js/document.querySelectorAll ".r-button")]
+          (ocall! btn :classList.remove "active"))
+        (when-let [id (get button-ids selected-robot)]
+          (ocall! (js/document.getElementById id) :classList.add "active"))))
     (let [{:keys [ball robots]} @pixi]
-        (when-let [[wx wy] (-> state :cursor :world)]
+        (when-let [[wx wy] (-> new-state :cursor :world)]
           (oset! (js/document.getElementById "mouse-pos")
                  :innerText (u/format "[%1 %2]"
                                       (.toFixed wx 3)
                                       (.toFixed wy 3))))
-        (when-let [snapshot (-> state :latest-snapshot)]
+        (when-let [snapshot (-> new-state :latest-snapshot)]
           ;(js/console.log (clj->js snapshot))
           (when-let [{:keys [x y stale-time]} (snapshot :ball)]
             (doto ball
@@ -161,11 +176,11 @@
 (defn start-update-loop [state-atom]
   (reset! updates (a/chan (a/sliding-buffer 1)))
   (add-watch state-atom ::updates 
-             (fn [_ _ _ new-state]
-               (a/put! @updates new-state)))
+             (fn [_ _ old new]
+               (a/put! @updates [old new])))
   (go (loop []
-        (when-some [update (<! @updates)]
-          (<! (update-ui update))
+        (when-some [[old new] (<! @updates)]
+          (<! (update-ui old new))
           ;(<! (a/timeout 16))
           (recur)))))
 
@@ -174,9 +189,10 @@
     (a/close! upd)))
 
 (defn initialize! [state-atom]
-  (initialize-main-ui!)
-  (initialize-pixi! state-atom)
-  (start-update-loop state-atom))
+  (doto state-atom
+    (initialize-main-ui!)
+    (initialize-pixi!)
+    (start-update-loop)))
 
 (defn terminate! []
   (stop-update-loop)
@@ -191,6 +207,8 @@
 
 
   (def state-atom rsvisualizer.main/state)
+  (-> @state-atom :selected-robot)
+  (swap! state-atom assoc :selected-robot nil)
   (def app (-> @pixi :app))
   (def field (-> @pixi :field))
   (def robots (-> @pixi :robots))
