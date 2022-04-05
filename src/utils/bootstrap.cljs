@@ -198,6 +198,12 @@
                   (show-toast {:delay 2500})))
           (<! (a/timeout 50))
           (recur (inc i)))))
+  
+  (doto (make-toast :header (list [:strong.me-auto "Bootstrap"]
+                                  [:small "11 mins ago"]
+                                  [:button.btn-close {:type "button" :data-bs-dismiss "toast" :aria-label "Close"}])
+                    :body "Hellow, world! This is a toast message.")
+    (show-toast))
 
   (let [toast (crate/html
                [:div.toast {:role "alert" :aria-live "assertive" :aria-atomic "true"}

@@ -77,7 +77,9 @@
 (comment
 
   (b/alert "Richo capo!")
-  (b/show-toast (b/make-toast :header "RICHO!")))
+  (b/show-toast (b/make-toast :header "RICHO!"))
+  
+  )
 
 
 (defn initialize-main-ui! []
