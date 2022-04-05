@@ -51,3 +51,6 @@
     (doto obj
       (oset! :height h)
       (oset! :width w))))
+
+(defn add-ticker! [app f]
+  (ocall! (oget app :ticker) :add f))

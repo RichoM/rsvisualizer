@@ -105,23 +105,41 @@
             field (doto (pixi/make-sprite! (<! (pixi/load-texture! "imgs/field.png")))
                     (pixi/set-position! (pixi/get-screen-center app))
                     (pixi/add-to! (oget app :stage)))
-            robots (let [robot-texture (<! (pixi/load-texture! "imgs/robot.png"))]
-                     (mapv (fn [idx]
-                             (doto (pixi/make-sprite! robot-texture)
-                               (oset! :tint 0x00aaff)
-                               (oset! :interactive true)
-                               (ocall! :on "click" (fn [e] 
-                                                     (js/console.log e)
-                                                     (ocall! e :stopPropagation)
-                                                     (swap! state-atom update :selected-robot
-                                                            #(if (= % idx) nil idx))))
-                               (pixi/set-position! [(* 50 (dec idx)) -50])
-                               (pixi/add-to! field)))
-                           (range 3)))
             ball (doto (pixi/make-sprite! (<! (pixi/load-texture! "imgs/ball.png")))
                    (oset! :tint 0x00ff00)
                    (pixi/set-position! [0 0])
-                   (pixi/add-to! field))]
+                   (pixi/add-to! field))
+            robots (let [robot-texture (<! (pixi/load-texture! "imgs/robot.png"))
+                         label-style (js/PIXI.TextStyle.  (clj->js {:fontFamily "sans-serif" ;"DatalegreyaThin"
+                                                                    :fontSize 26
+                                                                    :fontWeight "bold"
+                                                                    :fill "#ffffff"
+                                                                    :stroke "#000000"
+                                                                    :strokeThickness 4}))]
+                     (mapv (fn [idx]
+                             (let [add-robot-label! (fn [robot idx]
+                                                      (let [
+                                                            label (js/PIXI.Text. (str idx) label-style)
+                                                            ticker #(doto label
+                                                                      (oset! :x (oget robot :x))
+                                                                      (oset! :y (+ (oget robot :y) 0)))]
+                                                        (doto label
+                                                          (oset! :anchor.x 0.5)
+                                                          (oset! :anchor.y 0.5)
+                                                          (pixi/add-to! field))
+                                                        (pixi/add-ticker! app ticker)))]
+                               (doto (pixi/make-sprite! robot-texture)
+                                 (oset! :tint 0x00aaff)
+                                 (oset! :interactive true)
+                                 (ocall! :on "click" (fn [e]
+                                                       (js/console.log e)
+                                                       (ocall! e :stopPropagation)
+                                                       (swap! state-atom update :selected-robot
+                                                              #(if (= % idx) nil idx))))
+                                 (pixi/set-position! [(* 50 (dec idx)) -50])
+                                 (pixi/add-to! field)
+                                 (add-robot-label! (inc idx)))))
+                           (range 3)))]
         (doto field
           (oset! :interactive true)
           (ocall! :on "click" (fn [e] 
@@ -218,5 +236,6 @@
     (pixi/set-position! [-200 0])
     (pixi/set-rotation! 0))
   
+  (js/console.log ball)
   )
   
