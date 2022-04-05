@@ -1,6 +1,8 @@
 (ns rsvisualizer.main
   (:require [clojure.core.async :as a :refer [go <!]]
+            [clojure.string :as str]
             [oops.core :refer [oget oset! ocall!]]
+            [utils.bootstrap :as b]
             [utils.core :as u]
             [rsvisualizer.ui :as ui]))
 
@@ -8,6 +10,21 @@
 
 (defonce state (atom {}))
 (defonce ws (atom nil))
+
+(declare connect-to-server!)
+
+(defn ws-url [address]
+  (str "ws://" address ":7777/updates"))
+
+(defn ask-address [default]
+  (go (let [name (str/trim (or (<! (b/prompt "Enter address:" "" default)) ""))]
+        (if-not (empty? name)
+          name
+          (<! (ask-address default))))))
+
+(defn show-connection-dialog [default]
+  (go (let [address (<! (ask-address default))]
+        (<! (connect-to-server! address)))))
 
 (defn disconnect-from-server! []
   (go (when-let [[socket _] (reset-vals! ws nil)]
@@ -21,34 +38,47 @@
       (oset! :onopen #(a/put! result socket)))
     result))
 
+(defn show-msg [msg &[icon]]
+  (-> (b/make-toast :header (list (when icon icon)
+                                  [:strong.me-auto msg]
+                                  [:button.btn-close {:type "button" :data-bs-dismiss "toast" :aria-label "Close"}]))
+      (b/show-toast))
+  (print msg))
+
 (defn try-to-connect-ws!
-  [url]
-  (go (print "Waiting for connection...")
-      (if-let [socket (<! (connect-ws! url))]
-        (do (print "Connection successful!")
+  [address]
+  (go (show-msg (str "Connecting to " address))
+      (if-let [socket (<! (connect-ws! (ws-url address)))]
+        (do (show-msg "Connection successful!" [:i.fa-solid.fa-circle-check.me-3])
+            (oset! js/localStorage "!rsvisualizer-address" address)
             (reset! ws socket)
             (doto socket
               (oset! :onclose 
                      #(go (loop [retry 1]
                             (if (> retry 10)
-                              (print "Too many retries. BYE")
+                              (do (show-msg "Too many retries. Giving up...")
+                                  (<! (a/timeout 1000))
+                                  (<! (show-connection-dialog address)))
                               (if-not (= socket @ws)
                                 (print "OLD SOCKET. BYE")
-                                (when-not (<! (try-to-connect-ws! url))
-                                  (print (u/format "Retrying in 1s (retry: %1)" retry))
+                                (when-not (<! (try-to-connect-ws! address))
+                                  (show-msg (u/format "Retrying in 1s (retry: %1)" retry))
                                   (<! (a/timeout 1000))
                                   (recur (inc retry))))))))
               (oset! :onmessage
                      (fn [msg] (swap! state assoc :latest-snapshot
                                       (js->clj (js/JSON.parse (oget msg :data))
                                                :keywordize-keys true))))))
-        (print "Connection failed"))))
+        (do (show-msg "Connection failed" [:i.fa-solid.fa-triangle-exclamation.me-3])
+            nil))))
 
-(defn connect-to-server! []
-  (go (let [url "ws://192.168.0.23:7777/updates"
-            ;url "ws://localhost:7777/updates"
-            ]
-        (<! (try-to-connect-ws! url)))))
+(defn connect-to-server!
+  ([] (connect-to-server! (or (oget js/localStorage "?rsvisualizer-address") 
+                              "127.0.0.1")))
+  ([address]
+   (go (when-not (<! (try-to-connect-ws! address))
+         (<! (a/timeout 1000))
+         (<! (show-connection-dialog address))))))
 
 (defn init []
   (go (print "RICHO!")
@@ -56,7 +86,8 @@
       (<! (connect-to-server!))))
 
 (defn ^:dev/before-load-async reload-begin* [done]
-  (go (ui/terminate!)
+  (go (b/hide-modals)
+      (ui/terminate!)
       (<! (disconnect-from-server!))
       (done)))
 
