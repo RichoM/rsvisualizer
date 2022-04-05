@@ -1,4 +1,4 @@
-body {
+#main-container {
   font-family: 'AlegreyaSansRegular', Verdana, sans-serif;
   user-select: none;
   -moz-user-select: none;
@@ -6,7 +6,7 @@ body {
   -ms-user-select: none;
 }
 
-h3 {
+#main-container h3 {
   font-family: 'DatalegreyaThin', Verdana, sans-serif;
 }
 

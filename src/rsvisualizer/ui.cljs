@@ -22,7 +22,7 @@
 
 (defn main-container []
   (crate/html
-   [:div.container-fluid
+   [:div#main-container.container-fluid
     [:div.row
      [:div#side-bar.col-auto
       [:h3.my-1.text-center "RS Visualizer"]
