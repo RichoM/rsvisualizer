@@ -147,7 +147,7 @@
                                               (oset! label :text (u/format "[%1 %2]"
                                                                            (.toFixed wx 3)
                                                                            (.toFixed wy 3)))
-                                              (pixi/set-position! label [(+ px 10) py])))
+                                              (pixi/set-position! label [(+ px 12) py])))
                      label)]
         (doto field
           (oset! :interactive true)
