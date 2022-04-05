@@ -138,7 +138,7 @@
                                                                    :stroke "#ffffff"
                                                                    :fill "#656565"
                                                                    :strokeThickness 5}))
-                         label (doto (pixi/make-label! "[0 0]" label-style)
+                         label (doto (pixi/make-label! "" label-style)
                                  (oset! :anchor.x 0.0))]
                      (pixi/add-child! field label)
                      (pixi/add-ticker! app #(when-let [{[wx wy] :world [px py] :pixel}
