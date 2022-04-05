@@ -186,12 +186,11 @@
       (when-let [snapshot (-> new-state :latest-snapshot)]          
         (when-let [{:keys [x y stale-time]} (snapshot :ball)]
           (doto ball
-            (oset! :tint (if (< stale-time 0.1)
-                           0x00ff00
-                           0xaaaaaa))
+            (oset! :tint (if (< stale-time 0.1) 0x00ff00 0xaaaaaa))
             (pixi/set-position! (world->pixel [x y]))))
         (doseq [[idx {:keys [x y a]}] (map-indexed vector (snapshot :robots))]
           (doto (nth robots idx)
+            (oset! :tint (if (= idx (-> new-state :selected-robot)) 0x99ffff 0x00aaff))
             (pixi/set-position! (world->pixel [x y]))
             (pixi/set-rotation! (* -1 a))))))))
 
