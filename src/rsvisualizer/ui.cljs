@@ -126,7 +126,6 @@
                                  (oset! :tint 0x00aaff)
                                  (oset! :interactive true)
                                  (ocall! :on "click" (fn [e]
-                                                       (js/console.log e)
                                                        (ocall! e :stopPropagation)
                                                        (swap! state-atom update :selected-robot
                                                               #(if (= % idx) nil idx))))
