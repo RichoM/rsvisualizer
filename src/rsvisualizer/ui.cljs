@@ -71,7 +71,7 @@
     (.appendChild (main-container))))
     
 (defn resize-field []
-  (let [{:keys [html app field]} @pixi]
+  (when-let [{:keys [html app field]} @pixi]
     (doto html
       (oset! :style.height
              (u/format "calc(100% - %1px)"
@@ -150,19 +150,27 @@
           ;(<! (a/timeout 16))
           (recur)))))
 
+(defn stop-update-loop []
+  (when-let [upd @updates]
+    (a/close! upd)))
+
 (defn initialize! [state-atom]
-  (go (initialize-main-ui!)
-      (<! (initialize-pixi! state-atom))
-      (start-update-loop state-atom)))
+  (initialize-main-ui!)
+  (initialize-pixi! state-atom)
+  (start-update-loop state-atom))
 
 (defn terminate! []
-  (go (a/close! @updates)
-      (ocall! (-> @pixi :app)
-              :destroy true {:children true
-                             :texture true
-                             :baseTexture true})))
+  (stop-update-loop)
+  (try
+    (let [[old _] (reset-vals! pixi nil)]
+      (when-let [app (:app old)]
+        (ocall! app :destroy true true)))
+    (catch :default err
+      (print "ERROR" err))))
 
 (comment
+
+
   (def state-atom rsvisualizer.main/state)
   (def app (-> @pixi :app))
   (def field (-> @pixi :field))
@@ -172,5 +180,6 @@
   (doto (first robots)
     (pixi/set-position! [-200 0])
     (pixi/set-rotation! 0))
+  
   )
   
