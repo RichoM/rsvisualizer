@@ -4,6 +4,7 @@
             [oops.core :refer [oget oset! ocall!]]
             [crate.core :as crate]
             [utils.pixi :as pixi]
+            [utils.bootstrap :as b]
             [utils.core :as u]))
 
 (defonce pixi (atom nil))
@@ -65,10 +66,26 @@
        [:div#mouse-pos.position-absolute.start-0.top-0.font-monospace]]]]]
     ))
 
+(defn modal-container []
+  (crate/html [:div#modal-dialogs]))
+
+(defn toast-container []
+  (crate/html [:div#toast-container.toast-container.position-absolute.end-0.top-0.p-3
+               ]))
+
+
+(comment
+
+  (b/alert "Richo capo!")
+  (b/show-toast (b/make-toast :header "RICHO!")))
+
+
 (defn initialize-main-ui! []
   (doto js/document.body
     (oset! :innerHTML "")
-    (.appendChild (main-container))))
+    (.appendChild (main-container))
+    (.appendChild (modal-container))
+    (.appendChild (toast-container))))
     
 (defn resize-field []
   (when-let [{:keys [html app field]} @pixi]
