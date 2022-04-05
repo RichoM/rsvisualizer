@@ -110,7 +110,7 @@
                    (pixi/set-position! [0 0])
                    (pixi/add-to! field))
             robots (let [robot-texture (<! (pixi/load-texture! "imgs/robot.png"))
-                         label-style (js/PIXI.TextStyle.  (clj->js {:fontFamily "sans-serif" ;"DatalegreyaThin"
+                         label-style (js/PIXI.TextStyle.  (clj->js {:fontFamily "sans-serif"
                                                                     :fontSize 26
                                                                     :fontWeight "bold"
                                                                     :fill "#ffffff"
@@ -118,15 +118,10 @@
                                                                     :strokeThickness 4}))]
                      (mapv (fn [idx]
                              (let [add-robot-label! (fn [robot idx]
-                                                      (let [
-                                                            label (js/PIXI.Text. (str idx) label-style)
-                                                            ticker #(doto label
-                                                                      (oset! :x (oget robot :x))
-                                                                      (oset! :y (+ (oget robot :y) 0)))]
-                                                        (doto label
-                                                          (oset! :anchor.x 0.5)
-                                                          (oset! :anchor.y 0.5)
-                                                          (pixi/add-to! field))
+                                                      (let [label (pixi/make-label! idx label-style)
+                                                            ticker #(pixi/set-position! label [(oget robot :x)
+                                                                                               (+ (oget robot :y) 0)])]
+                                                        (pixi/add-child! field label)
                                                         (pixi/add-ticker! app ticker)))]
                                (doto (pixi/make-sprite! robot-texture)
                                  (oset! :tint 0x00aaff)
@@ -139,10 +134,25 @@
                                  (pixi/set-position! [(* 50 (dec idx)) -50])
                                  (pixi/add-to! field)
                                  (add-robot-label! (inc idx)))))
-                           (range 3)))]
+                           (range 3)))
+            cursor (let [label-style (js/PIXI.TextStyle.  (clj->js {:fontFamily "monospace"
+                                                                    :fontSize 20
+                                                                    :stroke "#ffffff"
+                                                                    :fill "#000000"
+                                                                    :strokeThickness 4}))
+                         label (doto (pixi/make-label! "[0 0]" label-style)
+                                 (oset! :anchor.x 0.0))]
+                     (pixi/add-child! field label)
+                     (pixi/add-ticker! app #(when-let [{[wx wy] :world [px py] :pixel}
+                                                       (-> @state-atom :cursor)]
+                                              (oset! label :text (u/format "[%1 %2]"
+                                                                           (.toFixed wx 3)
+                                                                           (.toFixed wy 3)))
+                                              (pixi/set-position! label [(+ px 10) py])))
+                     label)]
         (doto field
           (oset! :interactive true)
-          (ocall! :on "click" (fn [e] 
+          (ocall! :on "click" (fn [e]
                                 (ocall! e :stopPropagation)
                                 (swap! state-atom assoc :selected-robot nil)))
           (ocall! :on "mousemove"
@@ -156,7 +166,8 @@
                  :html html
                  :field field
                  :robots robots
-                 :ball ball})
+                 :ball ball
+                 :cursor cursor})
         (.addEventListener js/window "resize" resize-field)
         (resize-field))))
 
@@ -231,11 +242,15 @@
   (def field (-> @pixi :field))
   (def robots (-> @pixi :robots))
   (def ball (-> @pixi :ball))
+  (def cursor (-> @pixi :cursor))
   
+  (oget cursor :height)
+  ((oget cursor :parent.x))
+  (js-keys cursor)
   (doto (first robots)
     (pixi/set-position! [-200 0])
     (pixi/set-rotation! 0))
-  
+
   (js/console.log ball)
   )
   
