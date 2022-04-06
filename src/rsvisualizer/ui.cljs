@@ -109,7 +109,7 @@
       (b/on-click (js/document.getElementById selector)
                   #(swap! state-atom update :selected-robot (toggle-selection idx)))))
   (let [use-degrees (js/document.getElementById "use-degrees")]
-    (b/on-click use-degrees #(swap! state-atom assoc :degrees? 
+    (b/on-click use-degrees #(swap! state-atom assoc-in [:settings :degrees?]
                                     (oget use-degrees :checked)))))
     
 (defn resize-field []
@@ -200,8 +200,8 @@
         (resize-field))))
 
 (defn update-ui [old-state new-state]
-  (go 
-    (let [{:keys [ball robots]} @pixi]
+  (go
+    (when-let [{:keys [ball robots]} @pixi]
       (when (not= (-> old-state :selected-robot)
                   (-> new-state :selected-robot))
         (let [selected-robot (-> new-state :selected-robot)]
@@ -227,12 +227,17 @@
         (doseq [[idx {:keys [x y a]}] (map-indexed vector (snapshot :robots))]
           (oset! (js/document.getElementById (str "r" idx "-x")) :innerText (.toFixed x 3))
           (oset! (js/document.getElementById (str "r" idx "-y")) :innerText (.toFixed y 3))
-          (oset! (js/document.getElementById (str "r" idx "-a")) :innerText (if (-> new-state :degrees?)
-                                                                              (str (.toFixed (/ a (/ Math/PI 180)) 3) "deg")
-                                                                              (str (.toFixed a 3) "rad")))
+          (oset! (js/document.getElementById (str "r" idx "-a"))
+                 :innerText (if (-> new-state :settings :degrees?)
+                              (str (.toFixed (/ a (/ Math/PI 180)) 3) "deg")
+                              (str (.toFixed a 3) "rad")))
           (doto (nth robots idx)
             (pixi/set-position! (world->pixel [x y]))
-            (pixi/set-rotation! (* -1 a))))))))
+            (pixi/set-rotation! (* -1 a))))))
+    (when (not= (-> old-state :settings)
+                (-> new-state :settings))
+      (oset! (js/document.getElementById "use-degrees") :checked
+             (-> new-state :settings :degrees?)))))
 
 (defn start-update-loop [state-atom]
   (reset! updates (a/chan (a/sliding-buffer 1)))
@@ -249,11 +254,22 @@
   (when-let [upd @updates]
     (a/close! upd)))
 
+(defn initialize-settings [state-atom]
+  (swap! state-atom assoc :settings
+         (js->clj (js/JSON.parse (oget js/localStorage "?rsvisualizer-settings"))
+                  :keywordize-keys true))
+  (add-watch state-atom ::settings
+             (fn [_ _ {old :settings} {new :settings}]
+               (when (not= old new)
+                 (oset! js/localStorage "!rsvisualizer-settings"
+                        (js/JSON.stringify (clj->js new)))))))
+
 (defn initialize! [state-atom]
   (doto state-atom
     (initialize-main-ui!)
     (initialize-pixi!)
-    (start-update-loop)))
+    (start-update-loop)
+    (initialize-settings)))
 
 (defn terminate! []
   (stop-update-loop)
@@ -265,7 +281,6 @@
       (print "ERROR" err))))
 
 (comment
-
 
   (def state-atom rsvisualizer.main/state)
   (-> @state-atom :selected-robot)
