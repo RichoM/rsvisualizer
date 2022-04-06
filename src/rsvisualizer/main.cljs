@@ -11,20 +11,26 @@
 (defonce state (atom {}))
 (defonce ws (atom nil))
 
+(defn show-msg [msg & [icon]]
+  (-> (b/make-toast :header (list (when icon icon)
+                                  [:strong.me-auto msg]
+                                  [:button.btn-close {:type "button" :data-bs-dismiss "toast" :aria-label "Close"}]))
+      (b/show-toast))
+  (print msg))
+
 (declare connect-to-server!)
 
 (defn ws-url [address]
   (str "ws://" address ":7777/updates"))
 
 (defn ask-address [default]
-  (go (let [name (str/trim (or (<! (b/prompt "Enter address:" "" default)) ""))]
-        (if-not (empty? name)
-          name
-          (<! (ask-address default))))))
+  (go (str/trim (or (<! (b/prompt "Enter address:" "" default)) ""))))
 
 (defn show-connection-dialog [default]
   (go (let [address (<! (ask-address default))]
-        (<! (connect-to-server! address)))))
+        (if (empty? address)
+          (show-msg "Staying disconnected. Reload page to retry...")
+          (<! (connect-to-server! address))))))
 
 (defn disconnect-from-server! []
   (go (when-let [[socket _] (reset-vals! ws nil)]
@@ -37,13 +43,6 @@
       (oset! :onerror #(a/close! result))
       (oset! :onopen #(a/put! result socket)))
     result))
-
-(defn show-msg [msg &[icon]]
-  (-> (b/make-toast :header (list (when icon icon)
-                                  [:strong.me-auto msg]
-                                  [:button.btn-close {:type "button" :data-bs-dismiss "toast" :aria-label "Close"}]))
-      (b/show-toast))
-  (print msg))
 
 (defn try-to-connect-ws!
   [address]
