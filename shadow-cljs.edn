@@ -14,7 +14,7 @@
 
  :builds {:main {:target :browser
                  :output-dir "public/main/js"
-                 :compiler-options {:externs ["externs.js"]
+                 :compiler-options {:optimizations :advanced
                                     :infer-externs :auto
                                     ;:pseudo-names true
                                     ;:pretty-print true
