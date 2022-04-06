@@ -46,7 +46,7 @@
         "Robot 3"]]
       [:div.row.my-2]
       [:div.form-check.form-switch.text-center.mx-3
-       [:input#ball-prediction.form-check-input {:type "checkbox" :role "switch" :checked false :disabled true}]
+       [:input#ball-prediction.form-check-input {:type "checkbox" :role "switch" :checked false}]
        [:label.form-check-.ebal {:for "ball-prediction"} "Ball prediction?"]]
       [:div.form-check.form-switch.text-center.mx-3
        [:input#use-degrees.form-check-input {:type "checkbox" :role "switch" :checked false}]
@@ -110,7 +110,10 @@
                   #(swap! state-atom update :selected-robot (toggle-selection idx)))))
   (let [use-degrees (js/document.getElementById "use-degrees")]
     (b/on-click use-degrees #(swap! state-atom assoc-in [:settings :degrees?]
-                                    (oget use-degrees :checked)))))
+                                    (oget use-degrees :checked))))
+  (let [ball-prediction (js/document.getElementById "ball-prediction")]
+    (b/on-click ball-prediction #(swap! state-atom assoc-in [:settings :ball-prediction?]
+                                        (oget ball-prediction :checked)))))
     
 (defn resize-field []
   (when-let [{:keys [html app field]} @pixi]
@@ -128,13 +131,26 @@
       (pixi/set-height! (- (oget app :screen.height) 15))
       (pixi/set-position! (pixi/get-screen-center app)))))
 
+
 (defn initialize-pixi! [state-atom]
   (go (let [html (js/document.getElementById "field-panel")
             app (pixi/make-application! html)
             field (doto (pixi/make-sprite! (<! (pixi/load-texture! "imgs/field.png")))
                     (pixi/set-position! (pixi/get-screen-center app))
                     (pixi/add-to! (oget app :stage)))
-            ball (doto (pixi/make-sprite! (<! (pixi/load-texture! "imgs/ball.png")))
+            ball-texture (<! (pixi/load-texture! "imgs/ball.png"))
+            previous-ball (doto (pixi/make-sprite! ball-texture)
+                            (oset! :alpha 0.5)
+                            (pixi/set-position! [0 0])
+                            (pixi/add-to! field))
+            future-balls (mapv (fn [idx]
+                                 (doto (pixi/make-sprite! ball-texture)
+                                   (oset! :alpha (+ 0.15 (* idx (/ -0.1 15))))
+                                   (oset! :tint 0x0000ff)
+                                   (pixi/set-position! [0 0])
+                                   (pixi/add-to! field)))
+                               (range 15))            
+            ball (doto (pixi/make-sprite! ball-texture)
                    (oset! :tint 0x00ff00)
                    (pixi/set-position! [0 0])
                    (pixi/add-to! field))
@@ -182,7 +198,7 @@
                                                            (oset! :visible true))
                                                          (oset! line :visible false)))
                                 #_(pixi/add-ticker! app #(when-let [{[px py] :pixel} (-> @state-atom :cursor)]
-                                                         (pixi/set-position! target [px py])))
+                                                           (pixi/set-position! target [px py])))
                                 target))
                             robots))
             cursor (let [label-style (js/PIXI.TextStyle. (clj->js {:fontFamily "monospace"
@@ -218,13 +234,16 @@
                  :robots robots
                  :targets targets
                  :ball ball
+                 :previous-ball previous-ball
+                 :future-balls future-balls
                  :cursor cursor})
         (.addEventListener js/window "resize" resize-field)
         (resize-field))))
 
 (defn update-ui [old-state new-state]
   (go
-    (when-let [{:keys [ball robots targets]} @pixi]
+    ;(js/console.log (clj->js new-state))
+    (when-let [{:keys [ball previous-ball future-balls robots targets]} @pixi]
       (when (not= (-> old-state :selected-robot)
                   (-> new-state :selected-robot))
         (let [selected-robot (-> new-state :selected-robot)]
@@ -239,34 +258,49 @@
                 (do (ocall! btn :classList.remove "active")
                     (ocall! row :classList.remove "text-primary")
                     (oset! robot :tint 0x00aaff)))))))
-      (when-let [{:keys [time] :as snapshot} (-> new-state :strategy :snapshot)]
-        (oset! (js/document.getElementById "time-display") :innerText (.toFixed time 3))
-        (when-let [{:keys [x y stale-time]} (snapshot :ball)]
-          (oset! (js/document.getElementById "ball-x") :innerText (.toFixed x 3))
-          (oset! (js/document.getElementById "ball-y") :innerText (.toFixed y 3))
-          (doto ball
-            (oset! :tint (if (< stale-time 0.1) 0x00ff00 0xaaaaaa))
-            (pixi/set-position! (world->pixel [x y]))))
-        (doseq [[idx {:keys [x y a]}] (map-indexed vector (snapshot :robots))]
-          (oset! (js/document.getElementById (str "r" idx "-x")) :innerText (.toFixed x 3))
-          (oset! (js/document.getElementById (str "r" idx "-y")) :innerText (.toFixed y 3))
-          (oset! (js/document.getElementById (str "r" idx "-a"))
-                 :innerText (if (-> new-state :settings :degrees?)
-                              (str (.toFixed (/ a (/ Math/PI 180)) 3) "deg")
-                              (str (.toFixed a 3) "rad")))
-          (doto (nth robots idx)
-            (pixi/set-position! (world->pixel [x y]))
-            (pixi/set-rotation! (* -1 a))))
-        (doseq [[idx target] (map-indexed vector (-> new-state :strategy :targets))]
-          (if-let [{:keys [x y]} target]
-            (doto (nth targets idx)
-              (oset! :visible true)
+      (when-let [{:keys [time robot] :as snapshot} (-> new-state :strategy :snapshot)]
+        (when (or (nil? (-> new-state :selected-robot))
+                  (= robot (-> new-state :selected-robot)))
+          (oset! (js/document.getElementById "time-display") :innerText (.toFixed time 3))
+          (when-let [{:keys [x y stale-time previous future]} (snapshot :ball)]
+            (oset! (js/document.getElementById "ball-x") :innerText (.toFixed x 3))
+            (oset! (js/document.getElementById "ball-y") :innerText (.toFixed y 3))
+            (doto ball
+              (oset! :tint (if (< stale-time 0.1) 0x00ff00 0xaaaaaa))
               (pixi/set-position! (world->pixel [x y])))
-            (oset! (nth targets idx) :visible false)))))
+            (if-let [{:keys [x y]} previous]
+              (doto previous-ball
+                (oset! :visible (-> new-state :settings :ball-prediction?))
+                (pixi/set-position! (world->pixel [x y])))
+              (oset! previous-ball :visible false))
+            (doseq [[idx future-ball] (map-indexed vector future-balls)]
+              (if-let [{:keys [x y]} (nth future idx nil)]
+                (doto future-ball
+                  (oset! :visible (-> new-state :settings :ball-prediction?))
+                  (pixi/set-position! (world->pixel [x y])))
+                (oset! future-ball :visible false))))
+          (doseq [[idx {:keys [x y a]}] (map-indexed vector (snapshot :robots))]
+            (oset! (js/document.getElementById (str "r" idx "-x")) :innerText (.toFixed x 3))
+            (oset! (js/document.getElementById (str "r" idx "-y")) :innerText (.toFixed y 3))
+            (oset! (js/document.getElementById (str "r" idx "-a"))
+                   :innerText (if (-> new-state :settings :degrees?)
+                                (str (.toFixed (/ a (/ Math/PI 180)) 3) "deg")
+                                (str (.toFixed a 3) "rad")))
+            (doto (nth robots idx)
+              (pixi/set-position! (world->pixel [x y]))
+              (pixi/set-rotation! (* -1 a))))
+          (doseq [[idx target] (map-indexed vector (-> new-state :strategy :targets))]
+            (if-let [{:keys [x y]} target]
+              (doto (nth targets idx)
+                (oset! :visible true)
+                (pixi/set-position! (world->pixel [x y])))
+              (oset! (nth targets idx) :visible false))))))
     (when (not= (-> old-state :settings)
                 (-> new-state :settings))
       (oset! (js/document.getElementById "use-degrees") :checked
-             (-> new-state :settings :degrees?)))))
+             (-> new-state :settings :degrees?))
+      (oset! (js/document.getElementById "ball-prediction") :checked
+             (-> new-state :settings :ball-prediction?)))))
 
 (defn start-update-loop [state-atom]
   (reset! updates (a/chan (a/sliding-buffer 1)))
