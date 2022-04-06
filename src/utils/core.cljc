@@ -35,3 +35,8 @@
        (str/replace t (str "%" (inc i)) (str val))
        (inc i))
       t)))
+
+(defn dist [[x y] [x' y']]
+  (let [dx (- x' x)
+        dy (- y' y)]
+    (Math/sqrt (+ (* dx dx) (* dy dy)))))
