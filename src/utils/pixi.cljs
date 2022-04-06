@@ -63,15 +63,18 @@
   (ocall! (oget app :ticker) :add f))
 
 (defn draw-dashed-line! 
-  [g [x y] [x' y']
-   & {:keys [gap] :or {gap 10}}]
-  (let [a (js/Math.atan2 (- y' y) (- x' x))
+  [g from to &{:keys [gap] :or {gap 10}}]
+  (let [[x y] from 
+        [x' y'] to
+        a (js/Math.atan2 (- y' y) (- x' x))
         dy (* gap (js/Math.sin a))
         dx (* gap (js/Math.cos a))
-        steps (/ (u/dist [x y] [x' y']) gap)]
-    (doseq [[[x0 y0] [x1 y1]] (partition 2 (take steps (map vector
-                                                            (iterate (partial + dx) x)
-                                                            (iterate (partial + dy) y))))]
+        steps (/ (u/dist from to) gap)]
+    (doseq [[[x0 y0] [x1 y1]]
+            (partition 2 (take steps
+                               (map vector
+                                    (iterate (partial + dx) x)
+                                    (iterate (partial + dy) y))))]
       (doto g
         (ocall! :moveTo x0 y0)
         (ocall! :lineTo x1 y1)))))
