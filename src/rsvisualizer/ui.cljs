@@ -46,8 +46,35 @@
         "Robot 3"]]
       [:div.row.my-2]
       [:div.form-check.form-switch.text-center.mx-3
-       [:input#ball-prediction.form-check-input {:type "checkbox" :role "switch" :checked true}]
-       [:label.form-check-.ebal {:for "ball-prediction"} "Ball prediction?"]]]
+       [:input#ball-prediction.form-check-input {:type "checkbox" :role "switch" :checked false :disabled true}]
+       [:label.form-check-.ebal {:for "ball-prediction"} "Ball prediction?"]]
+      [:div.form-check.form-switch.text-center.mx-3
+       [:input#use-degrees.form-check-input {:type "checkbox" :role "switch" :checked false}]
+       [:label.form-check-.ebal {:for "use-degrees"} "Use degrees?"]]
+      [:div#table-display.position-absolute.bottom-0
+       [:div.col
+        [:div.row
+         [:div.col-2.text-start "Time:"]
+         [:div#time-display.col-3.text-end "?"]]
+        [:div#ball-display.row
+         [:div.col-2.text-start "Ball:"]
+         [:div#ball-x.col-3.text-end "?"]
+         [:div#ball-y.col-3.text-end "?"]]
+        [:div#r0-display.row
+         [:div.col-2.text-start "R1:"]
+         [:div#r0-x.col-3.text-end "?"]
+         [:div#r0-y.col-3.text-end "?"]
+         [:div#r0-a.col-4.text-end "?"]]
+        [:div#r1-display.row
+         [:div.col-2.text-start "R2:"]
+         [:div#r1-x.col-3.text-end "?"]
+         [:div#r1-y.col-3.text-end "?"]
+         [:div#r1-a.col-4.text-end "?"]]
+        [:div#r2-display.row
+         [:div.col-2.text-start "R3:"]
+         [:div#r2-x.col-3.text-end "?"]
+         [:div#r2-y.col-3.text-end "?"]
+         [:div#r2-a.col-4.text-end "?"]]]]]
      [:div.col
       [:div#top-bar.row.text-center.py-1
        [:div.col]
@@ -80,7 +107,10 @@
   (let [toggle-selection (fn [new] (fn [old] (if (= old new) nil new)))]
     (doseq [[idx selector] (map-indexed vector ["r0-button" "r1-button" "r2-button"])]
       (b/on-click (js/document.getElementById selector)
-                  #(swap! state-atom update :selected-robot (toggle-selection idx))))))
+                  #(swap! state-atom update :selected-robot (toggle-selection idx)))))
+  (let [use-degrees (js/document.getElementById "use-degrees")]
+    (b/on-click use-degrees #(swap! state-atom assoc :degrees? 
+                                    (oget use-degrees :checked)))))
     
 (defn resize-field []
   (when-let [{:keys [html app field]} @pixi]
@@ -169,28 +199,37 @@
         (.addEventListener js/window "resize" resize-field)
         (resize-field))))
 
-
-
 (defn update-ui [old-state new-state]
   (go 
     (let [{:keys [ball robots]} @pixi]
       (when (not= (-> old-state :selected-robot)
                   (-> new-state :selected-robot))
-        (let [selected-robot (-> new-state :selected-robot)
-              button-ids ["r0-button" "r1-button" "r2-button"]]
-          (doseq [btn (js/document.querySelectorAll ".r-button")]
-            (ocall! btn :classList.remove "active"))
-          (when-let [id (get button-ids selected-robot)]
-            (ocall! (js/document.getElementById id) :classList.add "active"))
+        (let [selected-robot (-> new-state :selected-robot)]
           (doseq [[idx robot] (map-indexed vector robots)]
-            (oset! robot :tint
-                   (if (= idx selected-robot) 0x99ffff 0x00aaff)))))
-      (when-let [snapshot (-> new-state :latest-snapshot)]
+            (let [selected? (= idx selected-robot)
+                  btn (js/document.getElementById (str "r" idx "-button"))
+                  row (js/document.getElementById (str "r" idx "-display"))]
+              (if selected?
+                (do (ocall! btn :classList.add "active")
+                    (ocall! row :classList.add "text-primary")
+                    (oset! robot :tint 0x99ffff))
+                (do (ocall! btn :classList.remove "active")
+                    (ocall! row :classList.remove "text-primary")
+                    (oset! robot :tint 0x00aaff)))))))
+      (when-let [{:keys [time] :as snapshot} (-> new-state :latest-snapshot)]
+        (oset! (js/document.getElementById "time-display") :innerText (.toFixed time 3))
         (when-let [{:keys [x y stale-time]} (snapshot :ball)]
+          (oset! (js/document.getElementById "ball-x") :innerText (.toFixed x 3))
+          (oset! (js/document.getElementById "ball-y") :innerText (.toFixed y 3))
           (doto ball
             (oset! :tint (if (< stale-time 0.1) 0x00ff00 0xaaaaaa))
             (pixi/set-position! (world->pixel [x y]))))
         (doseq [[idx {:keys [x y a]}] (map-indexed vector (snapshot :robots))]
+          (oset! (js/document.getElementById (str "r" idx "-x")) :innerText (.toFixed x 3))
+          (oset! (js/document.getElementById (str "r" idx "-y")) :innerText (.toFixed y 3))
+          (oset! (js/document.getElementById (str "r" idx "-a")) :innerText (if (-> new-state :degrees?)
+                                                                              (str (.toFixed (/ a (/ Math/PI 180)) 3) "deg")
+                                                                              (str (.toFixed a 3) "rad")))
           (doto (nth robots idx)
             (pixi/set-position! (world->pixel [x y]))
             (pixi/set-rotation! (* -1 a))))))))
