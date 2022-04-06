@@ -51,11 +51,12 @@
   (oset! obj :rotation rot))
 
 (defn set-height! [obj h]
-  (let [w (* (oget obj :width)
-             (/ h (oget obj :height)))]
+  (let [ow (oget obj :width)
+        oh (oget obj :height)
+        w (* ow (/ h oh))]
     (doto obj
-      (oset! :height h)
-      (oset! :width w))))
+      (oset! :width w)
+      (oset! :height h))))
 
 (defn add-ticker! [app f]
   (ocall! (oget app :ticker) :add f))
