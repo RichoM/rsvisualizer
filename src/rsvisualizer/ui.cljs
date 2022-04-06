@@ -163,6 +163,28 @@
                                  (pixi/add-to! field)
                                  (add-robot-label! (inc idx)))))
                            (range 3)))
+            targets (let [cross-texture (<! (pixi/load-texture! "imgs/cross.png"))]
+                      (mapv (fn [robot]
+                              (let [target (doto (pixi/make-sprite! cross-texture)
+                                             (pixi/add-to! field))
+                                    line (doto (js/PIXI.Graphics.)
+                                           (pixi/add-to! field))]
+                                (pixi/add-ticker! app #(if (oget target :visible)
+                                                         (doto line
+                                                           (ocall! :clear)
+                                                           (ocall! :lineStyle (clj->js {:width 2
+                                                                                        :color 0x5555ff
+                                                                                        :alpha 0.5}))
+                                                           (pixi/draw-dashed-line! [(oget robot :x) (oget robot :y)]
+                                                                                   [(oget target :x) (oget target :y)]
+                                                                                   :gap 5)
+                                                           (ocall! :closePath)
+                                                           (oset! :visible true))
+                                                         (oset! line :visible false)))
+                                (pixi/add-ticker! app #(when-let [{[px py] :pixel} (-> @state-atom :cursor)]
+                                                         (pixi/set-position! target [px py])))
+                                target))
+                            robots))
             cursor (let [label-style (js/PIXI.TextStyle. (clj->js {:fontFamily "monospace"
                                                                    :fontSize 22
                                                                    :stroke "#ffffff"
@@ -194,6 +216,7 @@
                  :html html
                  :field field
                  :robots robots
+                 :targets targets
                  :ball ball
                  :cursor cursor})
         (.addEventListener js/window "resize" resize-field)
