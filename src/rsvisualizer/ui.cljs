@@ -181,7 +181,7 @@
                                                            (ocall! :closePath)
                                                            (oset! :visible true))
                                                          (oset! line :visible false)))
-                                (pixi/add-ticker! app #(when-let [{[px py] :pixel} (-> @state-atom :cursor)]
+                                #_(pixi/add-ticker! app #(when-let [{[px py] :pixel} (-> @state-atom :cursor)]
                                                          (pixi/set-position! target [px py])))
                                 target))
                             robots))
@@ -224,7 +224,7 @@
 
 (defn update-ui [old-state new-state]
   (go
-    (when-let [{:keys [ball robots]} @pixi]
+    (when-let [{:keys [ball robots targets]} @pixi]
       (when (not= (-> old-state :selected-robot)
                   (-> new-state :selected-robot))
         (let [selected-robot (-> new-state :selected-robot)]
@@ -239,7 +239,7 @@
                 (do (ocall! btn :classList.remove "active")
                     (ocall! row :classList.remove "text-primary")
                     (oset! robot :tint 0x00aaff)))))))
-      (when-let [{:keys [time] :as snapshot} (-> new-state :latest-snapshot)]
+      (when-let [{:keys [time] :as snapshot} (-> new-state :strategy :snapshot)]
         (oset! (js/document.getElementById "time-display") :innerText (.toFixed time 3))
         (when-let [{:keys [x y stale-time]} (snapshot :ball)]
           (oset! (js/document.getElementById "ball-x") :innerText (.toFixed x 3))
@@ -256,7 +256,13 @@
                               (str (.toFixed a 3) "rad")))
           (doto (nth robots idx)
             (pixi/set-position! (world->pixel [x y]))
-            (pixi/set-rotation! (* -1 a))))))
+            (pixi/set-rotation! (* -1 a))))
+        (doseq [[idx target] (map-indexed vector (-> new-state :strategy :targets))]
+          (if-let [{:keys [x y]} target]
+            (doto (nth targets idx)
+              (oset! :visible true)
+              (pixi/set-position! (world->pixel [x y])))
+            (oset! (nth targets idx) :visible false)))))
     (when (not= (-> old-state :settings)
                 (-> new-state :settings))
       (oset! (js/document.getElementById "use-degrees") :checked
@@ -306,6 +312,7 @@
 (comment
 
   (def state-atom rsvisualizer.main/state)
+  (-> @state-atom :strategy)
   (-> @state-atom :selected-robot)
   (swap! state-atom assoc :selected-robot nil)
   (def app (-> @pixi :app))

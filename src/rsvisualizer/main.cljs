@@ -65,7 +65,7 @@
                                   (<! (a/timeout 1000))
                                   (recur (inc retry))))))))
               (oset! :onmessage
-                     (fn [msg] (swap! state assoc :latest-snapshot
+                     (fn [msg] (swap! state assoc :strategy
                                       (js->clj (js/JSON.parse (oget msg :data))
                                                :keywordize-keys true))))))
         (do (show-msg "Connection failed" [:i.fa-solid.fa-triangle-exclamation.me-3])
