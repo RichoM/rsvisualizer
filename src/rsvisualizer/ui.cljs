@@ -80,12 +80,17 @@
        [:div.col]
        [:div.col-3
         [:div.d-grid
-         [:button.btn.btn-sm.btn-outline-dark.rounded-pill {:type "button"}
+         [:button.btn.btn-sm.btn-outline-dark.rounded-pill {:type "button" :disabled true}
+          [:i.fa-solid.fa-pen.me-2]
+          "Draw"]]]
+       [:div.col-3
+        [:div.d-grid
+         [:button.btn.btn-sm.btn-outline-dark.rounded-pill {:type "button" :disabled true}
           [:i.fa-solid.fa-ruler.me-2]
           "Measure"]]]
        [:div.col-3
         [:div.d-grid
-         [:button.btn.btn-sm.btn-outline-dark.rounded-pill {:type "button"}
+         [:button.btn.btn-sm.btn-outline-dark.rounded-pill {:type "button" :disabled true}
           [:i.fa-solid.fa-arrows-up-down-left-right.me-2]
           "Move"]]]
        [:div.col]]
