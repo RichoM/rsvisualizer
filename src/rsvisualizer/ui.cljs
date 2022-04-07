@@ -154,7 +154,7 @@
                                    (oset! :tint 0x0000ff)
                                    (pixi/set-position! [0 0])
                                    (pixi/add-to! field)))
-                               (range 15))            
+                               (range 15))
             ball (doto (pixi/make-sprite! ball-texture)
                    (oset! :tint 0x00ff00)
                    (pixi/set-position! [0 0])
@@ -184,6 +184,22 @@
                                  (pixi/add-to! field)
                                  (add-robot-label! (inc idx)))))
                            (range 3)))
+            roles (let [label-style (js/PIXI.TextStyle. (clj->js {:fontFamily "sans-serif"
+                                                                  :fontSize 16
+                                                                  :fill "#000000"
+                                                                  :stroke "#ffffff"
+                                                                  :strokeThickness 2}))]
+                    (mapv (fn [robot]
+                            (let [label (doto (pixi/make-label! "" label-style)
+                                          (pixi/add-to! field))]
+                              (pixi/add-ticker! app #(let [x (oget robot :x)
+                                                           y (if (< (oget robot :y)
+                                                                    (/ (oget field :height) -2))
+                                                               (+ (oget robot :y) 40)
+                                                               (+ (oget robot :y) -40))]
+                                                       (pixi/set-position! label [x y])))
+                              label))
+                          robots))
             targets (let [cross-texture (<! (pixi/load-texture! "imgs/cross.png"))]
                       (mapv (fn [robot]
                               (let [target (doto (pixi/make-sprite! cross-texture)
@@ -202,8 +218,6 @@
                                                            (ocall! :closePath)
                                                            (oset! :visible true))
                                                          (oset! line :visible false)))
-                                #_(pixi/add-ticker! app #(when-let [{[px py] :pixel} (-> @state-atom :cursor)]
-                                                           (pixi/set-position! target [px py])))
                                 target))
                             robots))
             cursor (let [label-style (js/PIXI.TextStyle. (clj->js {:fontFamily "monospace"
@@ -237,6 +251,7 @@
                  :html html
                  :field field
                  :robots robots
+                 :roles roles
                  :targets targets
                  :ball ball
                  :previous-ball previous-ball
@@ -248,7 +263,7 @@
 (defn update-ui [old-state new-state]
   (go
     ;(js/console.log (clj->js new-state))
-    (when-let [{:keys [ball previous-ball future-balls robots targets]} @pixi]
+    (when-let [{:keys [ball previous-ball future-balls robots roles targets]} @pixi]
       (when (not= (-> old-state :selected-robot)
                   (-> new-state :selected-robot))
         (let [selected-robot (-> new-state :selected-robot)]
@@ -284,7 +299,7 @@
                   (oset! :visible (-> new-state :settings :ball-prediction?))
                   (pixi/set-position! (world->pixel [x y])))
                 (oset! future-ball :visible false))))
-          (doseq [[idx {:keys [x y a target]}] (map-indexed vector (snapshot :robots))]
+          (doseq [[idx {:keys [x y a target role]}] (map-indexed vector (snapshot :robots))]
             (oset! (js/document.getElementById (str "r" idx "-x")) :innerText (.toFixed x 3))
             (oset! (js/document.getElementById (str "r" idx "-y")) :innerText (.toFixed y 3))
             (oset! (js/document.getElementById (str "r" idx "-a"))
@@ -298,7 +313,8 @@
               (doto (nth targets idx)
                 (oset! :visible true)
                 (pixi/set-position! (world->pixel [tx ty])))
-              (oset! (nth targets idx) :visible false))))))
+              (oset! (nth targets idx) :visible false))
+            (oset! (nth roles idx) :text (get role :name ""))))))
     (when (not= (-> old-state :settings)
                 (-> new-state :settings))
       (oset! (js/document.getElementById "use-degrees") :checked
@@ -359,6 +375,7 @@
   (def ball (-> @pixi :ball))
   (def cursor (-> @pixi :cursor))
   
+  (def robot (first robots))
   (oget cursor :height)
   ((oget cursor :parent.x))
   (js-keys cursor)
