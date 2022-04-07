@@ -203,6 +203,7 @@
             targets (let [cross-texture (<! (pixi/load-texture! "imgs/cross.png"))]
                       (mapv (fn [robot]
                               (let [target (doto (pixi/make-sprite! cross-texture)
+                                             (oset! :visible false)
                                              (pixi/add-to! field))
                                     line (doto (js/PIXI.Graphics.)
                                            (pixi/add-to! field))]
