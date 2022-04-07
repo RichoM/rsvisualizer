@@ -12,6 +12,13 @@
 
 (def ^:const PIXEL_TO_WORLD (/ 1.5 864))
 
+(def ^:const YELLOW_REGULAR 0xffff00)
+(def ^:const YELLOW_HIGHLIGHT 0xffba00)
+(def ^:const BLUE_REGULAR 0x00aaff)
+(def ^:const BLUE_HIGHLIGHT 0x00ffff)
+(def ^:const GRAY_REGULAR 0xaaaaaa)
+(def ^:const GRAY_HIGHLIGHT 0xdddddd)
+
 (defn pixel->world [[x y]]
   [(* x PIXEL_TO_WORLD)
    (* y PIXEL_TO_WORLD -1)])
@@ -174,7 +181,7 @@
                                                         (pixi/add-child! field label)
                                                         (pixi/add-ticker! app ticker)))]
                                (doto (pixi/make-sprite! robot-texture)
-                                 (oset! :tint 0x00aaff)
+                                 (oset! :tint GRAY_REGULAR)
                                  (oset! :interactive true)
                                  (ocall! :on "click" (fn [e]
                                                        (ocall! e :stopPropagation)
@@ -263,10 +270,10 @@
 
 (defn update-ui [old-state new-state]
   (go
-    ;(js/console.log (clj->js new-state))
+    (js/console.log (clj->js new-state))
     (when-let [{:keys [ball previous-ball future-balls robots roles targets]} @pixi]
-      (when (not= (-> old-state :selected-robot)
-                  (-> new-state :selected-robot))
+      (when (or (not= (-> old-state :selected-robot)
+                      (-> new-state :selected-robot)))
         (let [selected-robot (-> new-state :selected-robot)]
           (doseq [[idx robot] (map-indexed vector robots)]
             (let [selected? (= idx selected-robot)
@@ -274,11 +281,9 @@
                   row (js/document.getElementById (str "r" idx "-display"))]
               (if selected?
                 (do (ocall! btn :classList.add "active")
-                    (ocall! row :classList.add "text-primary")
-                    (oset! robot :tint 0x99ffff))
+                    (ocall! row :classList.add "text-primary"))
                 (do (ocall! btn :classList.remove "active")
-                    (ocall! row :classList.remove "text-primary")
-                    (oset! robot :tint 0x00aaff)))))))
+                    (ocall! row :classList.remove "text-primary")))))))
       (when-let [{:keys [time robot] :as snapshot} (-> new-state :strategy :snapshot)]
         (when (or (nil? (-> new-state :selected-robot))
                   (= robot (-> new-state :selected-robot)))
@@ -301,6 +306,13 @@
                   (pixi/set-position! (world->pixel [x y])))
                 (oset! future-ball :visible false))))
           (doseq [[idx {:keys [x y a target role]}] (map-indexed vector (snapshot :robots))]
+            (oset! (nth robots idx) :tint
+                   (let [color (-> new-state :strategy :snapshot :color)
+                         selected? (= idx (-> new-state :selected-robot))]
+                     (case color
+                       "Y" (if selected? YELLOW_HIGHLIGHT YELLOW_REGULAR)
+                       "B" (if selected? BLUE_HIGHLIGHT BLUE_REGULAR)
+                       (if selected? GRAY_HIGHLIGHT GRAY_REGULAR))))
             (oset! (js/document.getElementById (str "r" idx "-x")) :innerText (.toFixed x 3))
             (oset! (js/document.getElementById (str "r" idx "-y")) :innerText (.toFixed y 3))
             (oset! (js/document.getElementById (str "r" idx "-a"))
@@ -367,7 +379,7 @@
 (comment
 
   (def state-atom rsvisualizer.main/state)
-  (-> @state-atom :strategy)
+  (-> @state-atom :strategy :snapshot :color)
   (-> @state-atom :selected-robot)
   (swap! state-atom assoc :selected-robot nil)
   (def app (-> @pixi :app))
