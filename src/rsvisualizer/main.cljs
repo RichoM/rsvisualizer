@@ -21,7 +21,7 @@
 (declare connect-to-server!)
 
 (defn ws-url [address]
-  (str "ws://" address ":7777/updates"))
+  (str "ws://" address "/updates"))
 
 (defn ask-address [default]
   (go (str/trim (or (<! (b/prompt "Enter address:" "" default)) ""))))
@@ -73,7 +73,7 @@
 
 (defn connect-to-server!
   ([] (connect-to-server! (or (oget js/localStorage "?rsvisualizer-address") 
-                              "127.0.0.1")))
+                              "127.0.0.1:7777")))
   ([address]
    (go (when-not (<! (try-to-connect-ws! address))
          (<! (a/timeout 1000))
