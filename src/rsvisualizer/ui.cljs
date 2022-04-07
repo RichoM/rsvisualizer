@@ -314,7 +314,7 @@
   (go (loop []
         (when-some [[old new] (<! @updates)]
           (<! (update-ui old new))
-          ;(<! (a/timeout 16))
+          (<! (a/timeout 16))
           (recur)))))
 
 (defn stop-update-loop []
