@@ -284,7 +284,7 @@
                   (oset! :visible (-> new-state :settings :ball-prediction?))
                   (pixi/set-position! (world->pixel [x y])))
                 (oset! future-ball :visible false))))
-          (doseq [[idx {:keys [x y a]}] (map-indexed vector (snapshot :robots))]
+          (doseq [[idx {:keys [x y a target]}] (map-indexed vector (snapshot :robots))]
             (oset! (js/document.getElementById (str "r" idx "-x")) :innerText (.toFixed x 3))
             (oset! (js/document.getElementById (str "r" idx "-y")) :innerText (.toFixed y 3))
             (oset! (js/document.getElementById (str "r" idx "-a"))
@@ -293,12 +293,11 @@
                                 (str (.toFixed a 3) "rad")))
             (doto (nth robots idx)
               (pixi/set-position! (world->pixel [x y]))
-              (pixi/set-rotation! (* -1 a))))
-          (doseq [[idx target] (map-indexed vector (-> new-state :strategy :targets))]
-            (if-let [{:keys [x y]} target]
+              (pixi/set-rotation! (* -1 a)))
+            (if-let [{{tx :x ty :y} :point} target]
               (doto (nth targets idx)
                 (oset! :visible true)
-                (pixi/set-position! (world->pixel [x y])))
+                (pixi/set-position! (world->pixel [tx ty])))
               (oset! (nth targets idx) :visible false))))))
     (when (not= (-> old-state :settings)
                 (-> new-state :settings))
