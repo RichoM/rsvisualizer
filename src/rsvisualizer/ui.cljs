@@ -305,14 +305,17 @@
                   (oset! :visible (-> new-state :settings :ball-prediction?))
                   (pixi/set-position! (world->pixel [x y])))
                 (oset! future-ball :visible false))))
-          (doseq [[idx {:keys [x y a target role]}] (map-indexed vector (snapshot :robots))]
+          (doseq [[idx {:keys [x y a target role flipped?]}] (map-indexed vector (snapshot :robots))]
             (oset! (nth robots idx) :tint
                    (let [color (-> new-state :strategy :snapshot :color)
                          selected? (= idx (-> new-state :selected-robot))]
-                     (case color
-                       "Y" (if selected? YELLOW_HIGHLIGHT YELLOW_REGULAR)
-                       "B" (if selected? BLUE_HIGHLIGHT BLUE_REGULAR)
-                       (if selected? GRAY_HIGHLIGHT GRAY_REGULAR))))
+                     (if flipped?
+                       (if selected? GRAY_HIGHLIGHT GRAY_REGULAR)
+                       (case color
+                         "Y" (if selected? YELLOW_HIGHLIGHT YELLOW_REGULAR)
+                         "B" (if selected? BLUE_HIGHLIGHT BLUE_REGULAR)
+                         (if selected? GRAY_HIGHLIGHT GRAY_REGULAR))))
+                   )
             (oset! (js/document.getElementById (str "r" idx "-x")) :innerText (.toFixed x 3))
             (oset! (js/document.getElementById (str "r" idx "-y")) :innerText (.toFixed y 3))
             (oset! (js/document.getElementById (str "r" idx "-a"))
