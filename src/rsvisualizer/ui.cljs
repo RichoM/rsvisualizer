@@ -269,74 +269,72 @@
         (resize-field))))
 
 (defn update-ui [old-state new-state]
-  (go
-    (js/console.log (clj->js new-state))
-    (when-let [{:keys [ball previous-ball future-balls robots roles targets]} @pixi]
-      (when (or (not= (-> old-state :selected-robot)
-                      (-> new-state :selected-robot)))
-        (let [selected-robot (-> new-state :selected-robot)]
-          (doseq [[idx robot] (map-indexed vector robots)]
-            (let [selected? (= idx selected-robot)
-                  btn (js/document.getElementById (str "r" idx "-button"))
-                  row (js/document.getElementById (str "r" idx "-display"))]
-              (if selected?
-                (do (ocall! btn :classList.add "active")
-                    (ocall! row :classList.add "text-primary"))
-                (do (ocall! btn :classList.remove "active")
-                    (ocall! row :classList.remove "text-primary")))))))
-      (when-let [{:keys [time robot] :as snapshot} (-> new-state :strategy :snapshot)]
-        (when (or (nil? (-> new-state :selected-robot))
-                  (= robot (-> new-state :selected-robot)))
-          (oset! (js/document.getElementById "time-display") :innerText (.toFixed time 3))
-          (when-let [{:keys [x y stale-time previous future]} (snapshot :ball)]
-            (oset! (js/document.getElementById "ball-x") :innerText (.toFixed x 3))
-            (oset! (js/document.getElementById "ball-y") :innerText (.toFixed y 3))
-            (doto ball
-              (oset! :tint (if (< stale-time 0.1) 0x00ff00 0xaaaaaa))
+  (js/console.log (clj->js new-state))
+  (when-let [{:keys [ball previous-ball future-balls robots roles targets]} @pixi]
+    (when (not= (-> old-state :selected-robot)
+                (-> new-state :selected-robot))
+      (let [selected-robot (-> new-state :selected-robot)]
+        (dotimes [idx (count robots)]
+          (let [selected? (= idx selected-robot)
+                btn (js/document.getElementById (str "r" idx "-button"))
+                row (js/document.getElementById (str "r" idx "-display"))]
+            (if selected?
+              (do (ocall! btn :classList.add "active")
+                  (ocall! row :classList.add "text-primary"))
+              (do (ocall! btn :classList.remove "active")
+                  (ocall! row :classList.remove "text-primary")))))))
+    (when-let [{:keys [time robot] :as snapshot} (-> new-state :strategy :snapshot)]
+      (when (or (nil? (-> new-state :selected-robot))
+                (= robot (-> new-state :selected-robot)))
+        (oset! (js/document.getElementById "time-display") :innerText (.toFixed time 3))
+        (when-let [{:keys [x y stale-time previous future]} (snapshot :ball)]
+          (oset! (js/document.getElementById "ball-x") :innerText (.toFixed x 3))
+          (oset! (js/document.getElementById "ball-y") :innerText (.toFixed y 3))
+          (doto ball
+            (oset! :tint (if (< stale-time 0.1) 0x00ff00 0xaaaaaa))
+            (pixi/set-position! (world->pixel [x y])))
+          (if-let [{:keys [x y]} previous]
+            (doto previous-ball
+              (oset! :visible (-> new-state :settings :ball-prediction?))
               (pixi/set-position! (world->pixel [x y])))
-            (if-let [{:keys [x y]} previous]
-              (doto previous-ball
+            (oset! previous-ball :visible false))
+          (doseq [[idx future-ball] (map-indexed vector future-balls)]
+            (if-let [{:keys [x y]} (nth future idx nil)]
+              (doto future-ball
                 (oset! :visible (-> new-state :settings :ball-prediction?))
                 (pixi/set-position! (world->pixel [x y])))
-              (oset! previous-ball :visible false))
-            (doseq [[idx future-ball] (map-indexed vector future-balls)]
-              (if-let [{:keys [x y]} (nth future idx nil)]
-                (doto future-ball
-                  (oset! :visible (-> new-state :settings :ball-prediction?))
-                  (pixi/set-position! (world->pixel [x y])))
-                (oset! future-ball :visible false))))
-          (doseq [[idx {:keys [x y a target role flipped?]}] (map-indexed vector (snapshot :robots))]
-            (oset! (nth robots idx) :tint
-                   (let [color (-> new-state :strategy :snapshot :color)
-                         selected? (= idx (-> new-state :selected-robot))]
-                     (if flipped?
-                       (if selected? GRAY_HIGHLIGHT GRAY_REGULAR)
-                       (case color
-                         "Y" (if selected? YELLOW_HIGHLIGHT YELLOW_REGULAR)
-                         "B" (if selected? BLUE_HIGHLIGHT BLUE_REGULAR)
-                         (if selected? GRAY_HIGHLIGHT GRAY_REGULAR))))
-                   )
-            (oset! (js/document.getElementById (str "r" idx "-x")) :innerText (.toFixed x 3))
-            (oset! (js/document.getElementById (str "r" idx "-y")) :innerText (.toFixed y 3))
-            (oset! (js/document.getElementById (str "r" idx "-a"))
-                   :innerText (if (-> new-state :settings :degrees?)
-                                (str (.toFixed (/ a (/ Math/PI 180)) 3) "deg")
-                                (str (.toFixed a 3) "rad")))
-            (doto (nth robots idx)
-              (pixi/set-position! (world->pixel [x y]))
-              (pixi/set-rotation! (* -1 a)))
-            (if-let [{{tx :x ty :y} :point} target]
-              (doto (nth targets idx)
-                (oset! :visible true)
-                (pixi/set-position! (world->pixel [tx ty])))
-              (oset! (nth targets idx) :visible false))
-            (oset! (nth roles idx) :text (get role :name ""))))))
-    (when (not= (-> old-state :settings)
-                (-> new-state :settings))
-      (oset! (js/document.getElementById "use-degrees") :checked
-             (-> new-state :settings :degrees?))
-      (oset! (js/document.getElementById "ball-prediction") :checked
-             (-> new-state :settings :ball-prediction?)))))
+              (oset! future-ball :visible false))))
+        (doseq [[idx {:keys [x y a target role flipped?]}] (map-indexed vector (snapshot :robots))]
+          (oset! (nth robots idx) :tint
+                 (let [color (-> new-state :strategy :snapshot :color)
+                       selected? (= idx (-> new-state :selected-robot))]
+                   (if flipped?
+                     (if selected? GRAY_HIGHLIGHT GRAY_REGULAR)
+                     (case color
+                       "Y" (if selected? YELLOW_HIGHLIGHT YELLOW_REGULAR)
+                       "B" (if selected? BLUE_HIGHLIGHT BLUE_REGULAR)
+                       (if selected? GRAY_HIGHLIGHT GRAY_REGULAR)))))
+          (oset! (js/document.getElementById (str "r" idx "-x")) :innerText (.toFixed x 3))
+          (oset! (js/document.getElementById (str "r" idx "-y")) :innerText (.toFixed y 3))
+          (oset! (js/document.getElementById (str "r" idx "-a"))
+                 :innerText (if (-> new-state :settings :degrees?)
+                              (str (.toFixed (/ a (/ Math/PI 180)) 3) "deg")
+                              (str (.toFixed a 3) "rad")))
+          (doto (nth robots idx)
+            (pixi/set-position! (world->pixel [x y]))
+            (pixi/set-rotation! (* -1 a)))
+          (if-let [{{tx :x ty :y} :point} target]
+            (doto (nth targets idx)
+              (oset! :visible true)
+              (pixi/set-position! (world->pixel [tx ty])))
+            (oset! (nth targets idx) :visible false))
+          (oset! (nth roles idx) :text (get role :name ""))))))
+  (when (not= (-> old-state :settings)
+              (-> new-state :settings))
+    (oset! (js/document.getElementById "use-degrees") :checked
+           (-> new-state :settings :degrees?))
+    (oset! (js/document.getElementById "ball-prediction") :checked
+           (-> new-state :settings :ball-prediction?))))
 
 (defn start-update-loop [state-atom]
   (reset! updates (a/chan (a/sliding-buffer 1)))
@@ -345,7 +343,7 @@
                (a/put! @updates [old new])))
   (go (loop []
         (when-some [[old new] (<! @updates)]
-          (<! (update-ui old new))
+          (update-ui old new)
           (<! (a/timeout 16))
           (recur)))))
 
