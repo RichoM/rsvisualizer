@@ -6,12 +6,12 @@
 
 (defonce pixi (atom nil))
 
-(def ^:const YELLOW_REGULAR 0xffff00)
-(def ^:const YELLOW_HIGHLIGHT 0xffba00)
-(def ^:const BLUE_REGULAR 0x00aaff)
-(def ^:const BLUE_HIGHLIGHT 0x00ffff)
-(def ^:const GRAY_REGULAR 0xaaaaaa)
-(def ^:const GRAY_HIGHLIGHT 0xdddddd)
+(def robot-colors {"Y" {:regular 0xffff00
+                        :highlight 0xffba00}
+                   "B" {:regular 0x00aaff
+                        :highlight 0x00ffff}
+                   nil {:regular 0xaaaaaa
+                        :highlight 0xdddddd}})
 
 (def ^:const PIXEL_TO_WORLD (/ 1.5 864))
 
@@ -44,7 +44,6 @@
        :ball (<! (pixi/load-texture! "imgs/ball.png"))
        :robot (<! (pixi/load-texture! "imgs/robot.png"))
        :cross (<! (pixi/load-texture! "imgs/cross.png"))}))
-
 
 (defn initialize-field! [state-atom app {field-texture :field}]
   (let [field (pixi/make-sprite! field-texture)]
@@ -98,7 +97,7 @@
                                                                            (oget robot :y)]))))]
     (mapv (fn [idx]
             (doto (pixi/make-sprite! robot-texture)
-              (oset! :tint GRAY_REGULAR)
+              (oset! :tint (get-in robot-colors [nil :regular]))
               (oset! :interactive true)
               (ocall! :on "click" (fn [e]
                                     (ocall! e :stopPropagation)
@@ -192,8 +191,15 @@
         (.addEventListener js/window "resize" resize-field)
         (resize-field))))
 
-(defn update! [new-state]
+(defn update-snapshot! [new-state]
   (when-let [{:keys [ball previous-ball future-balls robots roles targets]} @pixi]
+    (dotimes [idx 3]
+      (oset! (nth robots idx) :tint
+             (let [color (-> new-state :strategy :snapshot :color)
+                   selected? (= idx (-> new-state :selected-robot))
+                   flipped? (-> new-state :strategy :snapshot :robots (get idx) :flipped?)]
+               (get-in robot-colors [(if flipped? nil color)
+                                     (if selected? :highlight :regular)]))))
     (when-let [{:keys [robot] :as snapshot} (-> new-state :strategy :snapshot)]
       (when (or (nil? (-> new-state :selected-robot))
                 (= robot (-> new-state :selected-robot)))
@@ -212,16 +218,8 @@
                 (oset! :visible (-> new-state :settings :ball-prediction?))
                 (pixi/set-position! (world->pixel [x y])))
               (oset! future-ball :visible false))))
-        (doseq [[idx {:keys [x y a target role flipped?]}] (map-indexed vector (snapshot :robots))]
-          (oset! (nth robots idx) :tint
-                 (let [color (-> new-state :strategy :snapshot :color)
-                       selected? (= idx (-> new-state :selected-robot))]
-                   (if flipped?
-                     (if selected? GRAY_HIGHLIGHT GRAY_REGULAR)
-                     (case color
-                       "Y" (if selected? YELLOW_HIGHLIGHT YELLOW_REGULAR)
-                       "B" (if selected? BLUE_HIGHLIGHT BLUE_REGULAR)
-                       (if selected? GRAY_HIGHLIGHT GRAY_REGULAR)))))
+        (doseq [[idx {:keys [x y a target role flipped?]}] 
+                (map-indexed vector (snapshot :robots))]
           (doto (nth robots idx)
             (pixi/set-position! (world->pixel [x y]))
             (pixi/set-rotation! (* -1 a)))

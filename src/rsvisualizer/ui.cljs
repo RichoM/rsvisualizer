@@ -81,8 +81,7 @@
           [:i.fa-solid.fa-arrows-up-down-left-right.me-2]
           "Move"]]]
        [:div.col]]
-      [:div#field-panel]]]]
-    ))
+      [:div#field-panel]]]]))
 
 (defn modal-container []
   (crate/html [:div#modal-dialogs]))
@@ -107,20 +106,18 @@
     (b/on-click ball-prediction #(swap! state-atom assoc-in [:settings :ball-prediction?]
                                         (oget ball-prediction :checked)))))
     
-(defn update-ui [old-state new-state]
-  (js/console.log (clj->js new-state))
-  (when (not= (-> old-state :selected-robot)
-              (-> new-state :selected-robot))
-    (let [selected-robot (-> new-state :selected-robot)]
-      (dotimes [idx 3]
-        (let [selected? (= idx selected-robot)
-              btn (js/document.getElementById (str "r" idx "-button"))
-              row (js/document.getElementById (str "r" idx "-display"))]
-          (if selected?
-            (do (ocall! btn :classList.add "active")
-                (ocall! row :classList.add "text-primary"))
-            (do (ocall! btn :classList.remove "active")
-                (ocall! row :classList.remove "text-primary")))))))
+(defn update-selected-robot! [{:keys [selected-robot]}]
+  (dotimes [idx 3]
+    (let [selected? (= idx selected-robot)
+          btn (js/document.getElementById (str "r" idx "-button"))
+          row (js/document.getElementById (str "r" idx "-display"))]
+      (if selected?
+        (do (ocall! btn :classList.add "active")
+            (ocall! row :classList.add "text-primary"))
+        (do (ocall! btn :classList.remove "active")
+            (ocall! row :classList.remove "text-primary"))))))
+
+(defn update-table-display! [new-state]
   (when-let [{:keys [time robot] :as snapshot} (-> new-state :strategy :snapshot)]
     (when (or (nil? (-> new-state :selected-robot))
               (= robot (-> new-state :selected-robot)))
@@ -134,31 +131,38 @@
         (oset! (js/document.getElementById (str "r" idx "-a"))
                :innerText (if (-> new-state :settings :degrees?)
                             (str (.toFixed (/ a (/ Math/PI 180)) 3) "deg")
-                            (str (.toFixed a 3) "rad"))))))
-  (when (not= (-> old-state :settings)
-              (-> new-state :settings))
-    (oset! (js/document.getElementById "use-degrees") :checked
-           (-> new-state :settings :degrees?))
-    (oset! (js/document.getElementById "ball-prediction") :checked
-           (-> new-state :settings :ball-prediction?))))
+                            (str (.toFixed a 3) "rad")))))))
 
-(defn start-update-loop [state-atom]
+(defn update-settings-panel! [{{:keys [degrees? ball-prediction?]} :settings}]
+  (oset! (js/document.getElementById "use-degrees")
+         :checked degrees?)
+  (oset! (js/document.getElementById "ball-prediction")
+         :checked ball-prediction?))
+
+(defn start-update-loop! [state-atom]
   (reset! updates (a/chan (a/sliding-buffer 1)))
   (add-watch state-atom ::updates 
              (fn [_ _ old new]
-               (a/put! @updates [old new])))
+               (when (not= (-> old :selected-robot)
+                           (-> new :selected-robot))
+                 (update-selected-robot! new))
+               (when (not= (-> old :settings)
+                           (-> new :settings))
+                 (update-settings-panel! new))
+               (a/put! @updates new)))
   (go (loop []
-        (when-some [[old new] (<! @updates)]
-          (update-ui old new)
-          (pui/update! new)
+        (when-some [new-state (<! @updates)]
+          (js/console.log (clj->js new-state))
+          (update-table-display! new-state)
+          (pui/update-snapshot! new-state)
           (<! (a/timeout 16))
           (recur)))))
 
-(defn stop-update-loop []
+(defn stop-update-loop! []
   (when-let [upd @updates]
     (a/close! upd)))
 
-(defn initialize-settings [state-atom]
+(defn initialize-settings! [state-atom]
   (swap! state-atom assoc :settings
          (js->clj (js/JSON.parse (oget js/localStorage "?rsvisualizer-settings"))
                   :keywordize-keys true))
@@ -172,11 +176,11 @@
   (doto state-atom
     (initialize-main-ui!)
     (pui/initialize!)
-    (start-update-loop)
-    (initialize-settings)))
+    (start-update-loop!)
+    (initialize-settings!)))
 
 (defn terminate! []
-  (stop-update-loop)
+  (stop-update-loop!)
   (pui/terminate!))
 
   
