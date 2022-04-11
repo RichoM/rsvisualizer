@@ -140,23 +140,24 @@
          :checked ball-prediction?))
 
 (defn start-update-loop! [state-atom]
-  (reset! updates (a/chan (a/sliding-buffer 1)))
-  (add-watch state-atom ::updates 
-             (fn [_ _ old new]
-               (when (not= (-> old :selected-robot)
-                           (-> new :selected-robot))
-                 (update-selected-robot! new))
-               (when (not= (-> old :settings)
-                           (-> new :settings))
-                 (update-settings-panel! new))
-               (a/put! @updates new)))
-  (go (loop []
-        (when-some [new-state (<! @updates)]
-          (js/console.log (clj->js new-state))
-          (update-table-display! new-state)
-          (pui/update-snapshot! new-state)
-          (<! (a/timeout 16))
-          (recur)))))
+  (let [updates* (reset! updates (a/chan (a/sliding-buffer 1)))]
+    (add-watch state-atom ::updates
+               (fn [_ _ old new]
+                 (when (not= (-> old :selected-robot)
+                             (-> new :selected-robot))
+                   (update-selected-robot! new))
+                 (when (not= (-> old :settings)
+                             (-> new :settings))
+                   (update-settings-panel! new))
+                 (a/put! updates* new)))
+    (go (loop []
+          (when-some [new-state (<! updates*)]
+            (let [timeout (a/timeout 32)]
+              (js/console.log (clj->js new-state))
+              (update-table-display! new-state)
+              (pui/update-snapshot! new-state)
+              (<! timeout)
+              (recur)))))))
 
 (defn stop-update-loop! []
   (when-let [upd @updates]
