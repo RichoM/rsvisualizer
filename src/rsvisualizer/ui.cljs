@@ -89,6 +89,9 @@
 (defn toast-container []
   (crate/html [:div#toast-container.toast-container.position-absolute.end-0.top-0.p-3]))
 
+(defn get-element-by-id [id]
+  (js/document.getElementById id))
+
 (defn initialize-main-ui! [state-atom]
   (doto js/document.body
     (oset! :innerHTML "")
@@ -96,47 +99,51 @@
     (.appendChild (modal-container))
     (.appendChild (toast-container)))
   (let [toggle-selection (fn [new] (fn [old] (if (= old new) nil new)))]
-    (doseq [[idx selector] (map-indexed vector ["r0-button" "r1-button" "r2-button"])]
-      (b/on-click (js/document.getElementById selector)
-                  #(swap! state-atom update :selected-robot (toggle-selection idx)))))
-  (let [use-degrees (js/document.getElementById "use-degrees")]
+    (doseq [[i id] (map-indexed vector ["r0-button" "r1-button" "r2-button"])]
+      (b/on-click (get-element-by-id id)
+                  #(swap! state-atom update :selected-robot (toggle-selection i)))))
+  (let [use-degrees (get-element-by-id "use-degrees")]
     (b/on-click use-degrees #(swap! state-atom assoc-in [:settings :degrees?]
                                     (oget use-degrees :checked))))
-  (let [ball-prediction (js/document.getElementById "ball-prediction")]
+  (let [ball-prediction (get-element-by-id "ball-prediction")]
     (b/on-click ball-prediction #(swap! state-atom assoc-in [:settings :ball-prediction?]
                                         (oget ball-prediction :checked)))))
     
 (defn update-selected-robot! [{:keys [selected-robot]}]
   (dotimes [idx 3]
     (let [selected? (= idx selected-robot)
-          btn (js/document.getElementById (str "r" idx "-button"))
-          row (js/document.getElementById (str "r" idx "-display"))]
+          btn (get-element-by-id (str "r" idx "-button"))
+          row (get-element-by-id (str "r" idx "-display"))]
       (if selected?
         (do (ocall! btn :classList.add "active")
             (ocall! row :classList.add "text-primary"))
         (do (ocall! btn :classList.remove "active")
             (ocall! row :classList.remove "text-primary"))))))
 
+(defn to-fixed [n d]
+  (if n (.toFixed n d) ""))
+
 (defn update-table-display! [new-state]
   (when-let [{:keys [time robot] :as snapshot} (-> new-state :strategy :snapshot)]
     (when (or (nil? (-> new-state :selected-robot))
               (= robot (-> new-state :selected-robot)))
-      (oset! (js/document.getElementById "time-display") :innerText (.toFixed time 3))
+      (oset! (get-element-by-id "time-display") :innerText (to-fixed time 3))
       (when-let [{:keys [x y]} (snapshot :ball)]
-        (oset! (js/document.getElementById "ball-x") :innerText (.toFixed x 3))
-        (oset! (js/document.getElementById "ball-y") :innerText (.toFixed y 3)))
-      (doseq [[idx {:keys [x y a]}] (map-indexed vector (snapshot :robots))]
-        (oset! (js/document.getElementById (str "r" idx "-x")) :innerText (.toFixed x 3))
-        (oset! (js/document.getElementById (str "r" idx "-y")) :innerText (.toFixed y 3))
-        (oset! (js/document.getElementById (str "r" idx "-a"))
-               :innerText (if (-> new-state :settings :degrees?)
-                            (str (.toFixed (/ a (/ Math/PI 180)) 3) "deg")
-                            (str (.toFixed a 3) "rad")))))))
+        (oset! (get-element-by-id "ball-x") :innerText (to-fixed x 3))
+        (oset! (get-element-by-id "ball-y") :innerText (to-fixed y 3)))
+      (doseq [[idx robot-data] (map-indexed vector (snapshot :robots))]
+        (when-let [{:keys [x y a]} robot-data]
+          (oset! (get-element-by-id (str "r" idx "-x")) :innerText (to-fixed x 3))
+          (oset! (get-element-by-id (str "r" idx "-y")) :innerText (to-fixed y 3))
+          (oset! (get-element-by-id (str "r" idx "-a"))
+                 :innerText (if (-> new-state :settings :degrees?)
+                              (str (to-fixed (/ a (/ Math/PI 180)) 3) "deg")
+                              (str (to-fixed a 3) "rad"))))))))
 
 (defn update-settings-panel! [{{:keys [degrees? ball-prediction?]} :settings}]
-  (oset! (js/document.getElementById "use-degrees")
+  (oset! (get-element-by-id "use-degrees")
          :checked degrees?)
-  (oset! (js/document.getElementById "ball-prediction")
+  (oset! (get-element-by-id "ball-prediction")
          :checked ball-prediction?))
 
 (defn start-update-loop! [state-atom]
