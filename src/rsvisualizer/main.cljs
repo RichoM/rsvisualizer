@@ -4,6 +4,7 @@
             [oops.core :refer [oget oset! ocall!]]
             [utils.bootstrap :as b]
             [utils.core :as u]
+            [utils.ws :as ws]
             [rsvisualizer.ui :as ui]))
 
 (enable-console-print!)
@@ -20,9 +21,6 @@
 
 (declare connect-to-server!)
 
-(defn ws-url [address]
-  (str "ws://" address "/updates"))
-
 (defn ask-address [default]
   (go (str/trim (or (<! (b/prompt "Enter address:" "" default)) ""))))
 
@@ -36,18 +34,10 @@
   (go (when-let [[socket _] (reset-vals! ws nil)]
         (.close socket))))
 
-(defn connect-ws! [url]
-  (let [result (a/promise-chan)
-        socket (js/WebSocket. url)]
-    (doto socket
-      (oset! :onerror #(a/close! result))
-      (oset! :onopen #(a/put! result socket)))
-    result))
-
 (defn try-to-connect-ws!
   [address]
   (go (show-msg (str "Connecting to " address))
-      (if-let [socket (<! (connect-ws! (ws-url address)))]
+      (if-let [socket (<! (ws/try-connect! (str address "/updates")))]
         (do (show-msg "Connection successful!" [:i.fa-solid.fa-circle-check.me-3])
             (oset! js/localStorage "!rsvisualizer-address" address)
             (reset! ws socket)
