@@ -223,7 +223,7 @@
           (doto (nth robots idx)
             (pixi/set-position! (world->pixel [x y]))
             (pixi/set-rotation! (* -1 a)))
-          (if-let [{{tx :x ty :y} :target} action]
+          (if-let [{tx :x ty :y} (:target action)]
             (doto (nth targets idx)
               (oset! :visible true)
               (pixi/set-position! (world->pixel [tx ty])))
