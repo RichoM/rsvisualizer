@@ -119,9 +119,9 @@
                           (pixi/add-to! field))]
               (pixi/add-ticker! app #(let [x (oget robot :x)
                                            y (if (< (oget robot :y)
-                                                    (/ (oget field :height) -2))
+                                                    (/ (oget field :height) -3))
                                                (+ (oget robot :y) 40)
-                                               (+ (oget robot :y) -40))]
+                                               (- (oget robot :y) 40))]
                                        (pixi/set-position! label [x y])))
               label))
           robots)))
