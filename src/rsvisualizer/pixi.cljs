@@ -119,9 +119,9 @@
                           (pixi/add-to! field))]
               (pixi/add-ticker! app #(let [x (oget robot :x)
                                            y (if (< (oget robot :y)
-                                                    (/ (oget field :height) -2))
+                                                    (/ (oget field :height) -3))
                                                (+ (oget robot :y) 40)
-                                               (+ (oget robot :y) -40))]
+                                               (- (oget robot :y) 40))]
                                        (pixi/set-position! label [x y])))
               label))
           robots)))
@@ -218,12 +218,12 @@
                 (oset! :visible (-> new-state :settings :ball-prediction?))
                 (pixi/set-position! (world->pixel [x y])))
               (oset! future-ball :visible false))))
-        (doseq [[idx {:keys [x y a target role flipped?]}] 
+        (doseq [[idx {:keys [x y a action role]}] 
                 (map-indexed vector (snapshot :robots))]
           (doto (nth robots idx)
             (pixi/set-position! (world->pixel [x y]))
             (pixi/set-rotation! (* -1 a)))
-          (if-let [{{tx :x ty :y} :point} target]
+          (if-let [{tx :x ty :y} (:target action)]
             (doto (nth targets idx)
               (oset! :visible true)
               (pixi/set-position! (world->pixel [tx ty])))
