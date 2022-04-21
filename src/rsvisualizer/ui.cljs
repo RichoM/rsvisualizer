@@ -3,7 +3,8 @@
             [oops.core :refer [oget oset! ocall!]]
             [crate.core :as crate]
             [utils.bootstrap :as b]
-            [rsvisualizer.pixi :as pui]))
+            [rsvisualizer.pixi :as pui]
+            [rsvisualizer.history :as h]))
 
 (defonce updates (atom nil))
 
@@ -81,7 +82,19 @@
           [:i.fa-solid.fa-arrows-up-down-left-right.me-2]
           "Move"]]]
        [:div.col]]
-      [:div#field-panel]]]]))
+      [:div#field-panel
+       [:div#canvas-panel]
+       [:div#bottom-bar.row.text-center.py-1
+        [:div.col]
+        [:div.col-6
+           [:input#snapshot-range.form-range {:type "range" :min 0 :max 0 :step 1}]]
+        [:div.col-auto
+         [:div.btn-group.btn-group-sm {:role "group"}
+          [:button#snapshot-previous.btn.btn-outline-dark [:i.fa-solid.fa-backward-step]]
+          [:button#snapshot-play.btn.btn-outline-dark [:i.fa-solid.fa-play]]
+          [:button#snapshot-pause.btn.btn-outline-dark [:i.fa-solid.fa-pause]]
+          [:button#snapshot-next.btn.btn-outline-dark [:i.fa-solid.fa-forward-step]]]]
+        [:div.col]]]]]]))
 
 (defn modal-container []
   (crate/html [:div#modal-dialogs]))
@@ -107,7 +120,21 @@
                                     (oget use-degrees :checked))))
   (let [ball-prediction (get-element-by-id "ball-prediction")]
     (b/on-click ball-prediction #(swap! state-atom assoc-in [:settings :ball-prediction?]
-                                        (oget ball-prediction :checked)))))
+                                        (oget ball-prediction :checked))))
+  (let [snapshot-previous (get-element-by-id "snapshot-previous")]
+    (b/on-click snapshot-previous #(swap! state-atom update :selected-snapshot
+                                          (fn [n] (dec (or n (h/count (:history @state-atom))))))))
+  (let [snapshot-next (get-element-by-id "snapshot-next")]
+    (b/on-click snapshot-next #(swap! state-atom update :selected-snapshot inc)))
+  (let [snapshot-play (get-element-by-id "snapshot-play")]
+    (oset! snapshot-play :hidden true)
+    (b/on-click snapshot-play #(swap! state-atom assoc :selected-snapshot nil)))
+  (let [snapshot-pause (get-element-by-id "snapshot-pause")]
+    (b/on-click snapshot-pause #(swap! state-atom assoc :selected-snapshot 
+                                       (dec (h/count (:history @state-atom))))))
+  (let [snapshot-range (get-element-by-id "snapshot-range")]
+    (b/on-input snapshot-range #(swap! state-atom assoc :selected-snapshot 
+                                       (int (oget snapshot-range :value))))))
     
 (defn update-selected-robot! [{:keys [selected-robot]}]
   (dotimes [idx 3]
@@ -119,6 +146,18 @@
             (ocall! row :classList.add "text-primary"))
         (do (ocall! btn :classList.remove "active")
             (ocall! row :classList.remove "text-primary"))))))
+
+(defn update-selected-snapshot! [{:keys [selected-snapshot history]}]
+  (let [max (dec (h/count history))]
+    (doto (get-element-by-id "snapshot-range")
+      (oset! :max max)
+      (oset! :value (or selected-snapshot max)))
+    (oset! (get-element-by-id "snapshot-play") :hidden (nil? selected-snapshot))
+    (oset! (get-element-by-id "snapshot-pause") :hidden (some? selected-snapshot))
+    (oset! (get-element-by-id "snapshot-previous") :disabled (and (some? selected-snapshot) 
+                                                                  (<= selected-snapshot 0)))
+    (oset! (get-element-by-id "snapshot-next") :disabled (or (nil? selected-snapshot)
+                                                             (>= selected-snapshot max)))))
 
 (defn to-fixed [n d]
   (if n (.toFixed n d) ""))
@@ -160,8 +199,9 @@
     (go (loop []
           (when-some [new-state (<! updates*)]
             (let [timeout (a/timeout 32)]
-              (js/console.log (clj->js new-state))
+              ;(js/console.log (clj->js new-state))
               (update-table-display! new-state)
+              (update-selected-snapshot! new-state)
               (pui/update-snapshot! new-state)
               (<! timeout)
               (recur)))))))

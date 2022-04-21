@@ -5,7 +5,8 @@
             [utils.bootstrap :as b]
             [utils.core :as u]
             [utils.ws :as ws]
-            [rsvisualizer.ui :as ui]))
+            [rsvisualizer.ui :as ui]
+            [rsvisualizer.history :as h]))
 
 (enable-console-print!)
 
@@ -55,9 +56,12 @@
                                   (<! (a/timeout 1000))
                                   (recur (inc retry))))))))
               (oset! :onmessage
-                     (fn [msg] (swap! state assoc :strategy
-                                      (js->clj (js/JSON.parse (oget msg :data))
-                                               :keywordize-keys true))))))
+                     (fn [msg] (let [data (oget msg :data)
+                                     strategy (js->clj (js/JSON.parse data)
+                                                       :keywordize-keys true)]
+                                 (swap! state #(-> %
+                                                   (assoc :strategy strategy)
+                                                   (update :history h/append data))))))))
         (do (show-msg "Connection failed" [:i.fa-solid.fa-triangle-exclamation.me-3])
             nil))))
 
