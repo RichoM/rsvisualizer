@@ -2,7 +2,8 @@
   (:require [clojure.core.async :as a :refer [go <!]]
             [oops.core :refer [oget oset! ocall!]]
             [utils.pixi :as pixi]
-            [utils.core :as u]))
+            [utils.core :as u]
+            [rsvisualizer.history :as h]))
 
 (defonce pixi (atom nil))
 
@@ -28,8 +29,11 @@
     (doto html
       (oset! :style.height
              (u/format "calc(100% - %1px)"
-                       (+ 30 (oget (js/document.querySelector "#top-bar")
-                                   :offsetHeight))))
+                       (+ 10
+                          (oget (js/document.querySelector "#top-bar")
+                                :offsetHeight)
+                          (oget (js/document.querySelector "#bottom-bar")
+                                :offsetHeight))))
       (oset! :style.width
              (u/format "calc(100% - %1px)"
                        (+ 30 (oget (js/document.querySelector "#side-bar")
@@ -186,7 +190,7 @@
 
 (defn initialize! [state-atom]
   (go (let [html (js/document.getElementById "field-panel")
-            app (pixi/make-application! html)
+            app (pixi/make-application! (js/document.getElementById "canvas-panel"))
             textures (<! (load-textures!))
             field (initialize-field! state-atom app textures)
             previous-ball (initialize-previous-ball! field textures)
@@ -212,54 +216,69 @@
         (.addEventListener js/window "resize" resize-field)
         (resize-field))))
 
+(defn get-selected-snapshot 
+  [{:keys [selected-snapshot history strategy]}]
+  (if selected-snapshot
+    (:snapshot (h/get history selected-snapshot))
+    (:snapshot strategy)))
+
+
+(comment
+  
+  (def new-state @rsvisualizer.main/state)
+  (:selected-snapshot new-state)
+  
+  )
+
 (defn update-snapshot! [new-state]
   (when-let [{:keys [ball previous-ball future-balls robots roles targets rotators]} @pixi]
-    (dotimes [idx 3]
-      (oset! (nth robots idx) :tint
-             (let [color (-> new-state :strategy :snapshot :color)
-                   selected? (= idx (-> new-state :selected-robot))
-                   flipped? (-> new-state :strategy :snapshot :robots (get idx) :flipped?)]
-               (get-in robot-colors [(if flipped? nil color)
-                                     (if selected? :highlight :regular)]))))
-    (when-let [{:keys [robot] :as snapshot} (-> new-state :strategy :snapshot)]
-      (when (or (nil? (-> new-state :selected-robot))
-                (= robot (-> new-state :selected-robot)))
-        (when-let [{:keys [x y stale-time previous future]} (snapshot :ball)]
-          (doto ball
-            (oset! :tint (if (< stale-time 0.1) 0x00ff00 0xaaaaaa))
-            (pixi/set-position! (world->pixel [x y])))
-          (if-let [{:keys [x y]} previous]
-            (doto previous-ball
-              (oset! :visible (-> new-state :settings :ball-prediction?))
+    (let [snapshot (get-selected-snapshot new-state)]
+      (dotimes [idx 3]
+        (oset! (nth robots idx) :tint
+               (let [color (:color snapshot)
+                     selected? (= idx (-> new-state :selected-robot))
+                     flipped? (-> snapshot :robots (get idx) :flipped?)]
+                 (get-in robot-colors [(if flipped? nil color)
+                                       (if selected? :highlight :regular)]))))
+      (when-let [{:keys [robot]} snapshot]
+        (when (or (nil? (-> new-state :selected-robot))
+                  (= robot (-> new-state :selected-robot)))
+          (when-let [{:keys [x y stale-time previous future]} (:ball snapshot)]
+            (doto ball
+              (oset! :tint (if (< stale-time 0.1) 0x00ff00 0xaaaaaa))
               (pixi/set-position! (world->pixel [x y])))
-            (oset! previous-ball :visible false))
-          (doseq [[idx future-ball] (map-indexed vector future-balls)]
-            (if-let [{:keys [x y]} (nth future idx nil)]
-              (doto future-ball
+            (if-let [{:keys [x y]} previous]
+              (doto previous-ball
                 (oset! :visible (-> new-state :settings :ball-prediction?))
                 (pixi/set-position! (world->pixel [x y])))
-              (oset! future-ball :visible false))))
-        (doseq [[idx {:keys [x y a action role wheels]}] 
-                (map-indexed vector (snapshot :robots))]
-          (doto (nth robots idx)
-            (pixi/set-position! (world->pixel [x y]))
-            (pixi/set-rotation! (* -1 a)))
-          (if-let [{tx :x ty :y} (:target action)]
-            (doto (nth targets idx)
-              (oset! :visible true)
-              (pixi/set-position! (world->pixel [tx ty])))
-            (oset! (nth targets idx) :visible false))
-          (let [angle (:angle action)
-                opposite-angle #(mod (+ % Math/PI) (* Math/PI 2))]
-            (if (and angle
-                     (> (Math/abs (- angle a)) 0.02)
-                     (> (Math/abs (- angle (opposite-angle a))) 0.02))
-              (doto (nth rotators idx)
+              (oset! previous-ball :visible false))
+            (doseq [[idx future-ball] (map-indexed vector future-balls)]
+              (if-let [{:keys [x y]} (nth future idx nil)]
+                (doto future-ball
+                  (oset! :visible (-> new-state :settings :ball-prediction?))
+                  (pixi/set-position! (world->pixel [x y])))
+                (oset! future-ball :visible false))))
+          (doseq [[idx {:keys [x y a action role wheels]}]
+                  (map-indexed vector (:robots snapshot))]
+            (doto (nth robots idx)
+              (pixi/set-position! (world->pixel [x y]))
+              (pixi/set-rotation! (* -1 a)))
+            (if-let [{tx :x ty :y} (:target action)]
+              (doto (nth targets idx)
                 (oset! :visible true)
-                (oset! :scale.x (let [[vl vr] wheels]
-                                  (if (< vl vr) -1 1))))
-              (oset! (nth rotators idx) :visible false)))
-          (oset! (nth roles idx) :text (get role :name "")))))))
+                (pixi/set-position! (world->pixel [tx ty])))
+              (oset! (nth targets idx) :visible false))
+            (let [angle (:angle action)
+                  opposite-angle #(mod (+ % Math/PI) (* Math/PI 2))]
+              (if (and angle
+                       (> (Math/abs (- angle a)) 0.02)
+                       (> (Math/abs (- angle (opposite-angle a))) 0.02))
+                (doto (nth rotators idx)
+                  (oset! :visible true)
+                  (oset! :scale.x (let [[vl vr] wheels]
+                                    (if (< vl vr) -1 1))))
+                (oset! (nth rotators idx) :visible false)))
+            (oset! (nth roles idx) :text (get role :name ""))))))))
 
 (defn terminate! []
   (try

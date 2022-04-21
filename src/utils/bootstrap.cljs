@@ -10,6 +10,9 @@
 (defn on-click [element callback]
   (doto element (.addEventListener "click" callback)))
 
+(defn on-input [element callback]
+  (doto element (.addEventListener "input" callback)))
+
 (defn on-keypress [element keycode callback]
   (doto element
     (.addEventListener "keypress"
