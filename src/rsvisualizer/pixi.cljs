@@ -39,11 +39,12 @@
       (pixi/set-height! (- (oget app :screen.height) 15))
       (pixi/set-position! (pixi/get-screen-center app)))))
 
-(defn load-textures! []
+(defn load-textures! [] ; TODO(Richo): Load in parallel
   (go {:field (<! (pixi/load-texture! "imgs/field.png"))
        :ball (<! (pixi/load-texture! "imgs/ball.png"))
        :robot (<! (pixi/load-texture! "imgs/robot.png"))
-       :cross (<! (pixi/load-texture! "imgs/cross.png"))}))
+       :cross (<! (pixi/load-texture! "imgs/cross.png"))
+       :rotate (<! (pixi/load-texture! "imgs/rotate.png"))}))
 
 (defn initialize-field! [state-atom app {field-texture :field}]
   (let [field (pixi/make-sprite! field-texture)]
@@ -148,6 +149,16 @@
             target))
         robots))
 
+(defn initialize-rotators! [app field robots {rotate-texture :rotate}]
+  (mapv (fn [robot]
+          (let [rotator (doto (pixi/make-sprite! rotate-texture)
+                         (oset! :visible false)
+                         (pixi/add-to! field))]
+            (pixi/add-ticker! app #(pixi/set-position! rotator [(oget robot :x)
+                                                                (oget robot :y)]))
+            rotator))
+        robots))
+
 (defn initialize-cursor! [state-atom app field]
   (let [label-style (js/PIXI.TextStyle. (clj->js {:fontFamily "monospace"
                                                   :fontSize 22
@@ -176,6 +187,7 @@
             robots (initialize-robots! state-atom app field textures)
             roles (initialize-roles! app field robots)
             targets (initialize-targets! app field robots textures)
+            rotators (initialize-rotators! app field robots textures)
             cursor (initialize-cursor! state-atom app field)]
         (reset! pixi
                 {:app app
@@ -184,6 +196,7 @@
                  :robots robots
                  :roles roles
                  :targets targets
+                 :rotators rotators
                  :ball ball
                  :previous-ball previous-ball
                  :future-balls future-balls
@@ -192,7 +205,7 @@
         (resize-field))))
 
 (defn update-snapshot! [new-state]
-  (when-let [{:keys [ball previous-ball future-balls robots roles targets]} @pixi]
+  (when-let [{:keys [ball previous-ball future-balls robots roles targets rotators]} @pixi]
     (dotimes [idx 3]
       (oset! (nth robots idx) :tint
              (let [color (-> new-state :strategy :snapshot :color)
@@ -218,7 +231,7 @@
                 (oset! :visible (-> new-state :settings :ball-prediction?))
                 (pixi/set-position! (world->pixel [x y])))
               (oset! future-ball :visible false))))
-        (doseq [[idx {:keys [x y a action role]}] 
+        (doseq [[idx {:keys [x y a action role wheels]}] 
                 (map-indexed vector (snapshot :robots))]
           (doto (nth robots idx)
             (pixi/set-position! (world->pixel [x y]))
@@ -228,6 +241,16 @@
               (oset! :visible true)
               (pixi/set-position! (world->pixel [tx ty])))
             (oset! (nth targets idx) :visible false))
+          (let [angle (:angle action)
+                opposite-angle #(mod (+ % Math/PI) (* Math/PI 2))]
+            (if (and angle
+                     (> (Math/abs (- angle a)) 0.02)
+                     (> (Math/abs (- angle (opposite-angle a))) 0.02))
+              (doto (nth rotators idx)
+                (oset! :visible true)
+                (oset! :scale.x (let [[vl vr] wheels]
+                                  (if (< vl vr) -1 1))))
+              (oset! (nth rotators idx) :visible false)))
           (oset! (nth roles idx) :text (get role :name "")))))))
 
 (defn terminate! []
