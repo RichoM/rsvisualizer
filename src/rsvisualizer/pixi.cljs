@@ -39,12 +39,20 @@
       (pixi/set-height! (- (oget app :screen.height) 15))
       (pixi/set-position! (pixi/get-screen-center app)))))
 
-(defn load-textures! [] ; TODO(Richo): Load in parallel
-  (go {:field (<! (pixi/load-texture! "imgs/field.png"))
-       :ball (<! (pixi/load-texture! "imgs/ball.png"))
-       :robot (<! (pixi/load-texture! "imgs/robot.png"))
-       :cross (<! (pixi/load-texture! "imgs/cross.png"))
-       :rotate (<! (pixi/load-texture! "imgs/rotate.png"))}))
+(defn load-textures! []
+  (go (let [[field ball robot cross rotate]
+            (<! (->> ["imgs/field.png"
+                      "imgs/ball.png"
+                      "imgs/robot.png"
+                      "imgs/cross.png"
+                      "imgs/rotate.png"]
+                     (map pixi/load-texture!)
+                     (a/map vector)))]
+        {:field field
+         :ball ball
+         :robot robot
+         :cross cross
+         :rotate rotate})))
 
 (defn initialize-field! [state-atom app {field-texture :field}]
   (let [field (pixi/make-sprite! field-texture)]
