@@ -24,6 +24,11 @@
   [(/ x PIXEL_TO_WORLD)
    (/ y PIXEL_TO_WORLD -1)])
 
+(defn predict-movement [{:keys [x y velocity]} t]
+  (let [{vx :x vy :y} velocity]
+    [(+ x (* vx t))
+     (+ y (* vy t))]))
+
 (defn resize-field []
   (when-let [{:keys [html app field]} @pixi]
     (doto html
@@ -232,10 +237,12 @@
               (oset! :tint (if (< stale-time 0.1) 0x00ff00 0xaaaaaa))
               (pixi/set-position! (world->pixel [x y])))
             (doseq [[idx future-ball] (map-indexed vector future-balls)]
-              (if-let [{:keys [x y]} (nth future idx nil)]
+              (if (-> new-state :settings :ball-prediction?)
                 (doto future-ball
-                  (oset! :visible (-> new-state :settings :ball-prediction?))
-                  (pixi/set-position! (world->pixel [x y])))
+                  (oset! :visible true)
+                  (pixi/set-position! (world->pixel
+                                       (predict-movement (:ball snapshot)
+                                                         (* 0.128 (inc idx))))))
                 (oset! future-ball :visible false))))
           (doseq [[idx {:keys [x y a action role wheels]}]
                   (map-indexed vector (:robots snapshot))]
