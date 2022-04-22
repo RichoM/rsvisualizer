@@ -172,8 +172,14 @@
 (defn to-fixed [n d]
   (if n (.toFixed n d) ""))
 
+(defn get-selected-snapshot
+  [{:keys [selected-snapshot history strategy]}]
+  (if selected-snapshot
+    (:snapshot (h/get history selected-snapshot))
+    (:snapshot strategy)))
+
 (defn update-table-display! [new-state]
-  (when-let [{:keys [time robot] :as snapshot} (-> new-state :strategy :snapshot)]
+  (when-let [{:keys [time robot] :as snapshot} (get-selected-snapshot new-state)]
     (when (or (nil? (-> new-state :selected-robot))
               (= robot (-> new-state :selected-robot)))
       (oset! (get-element-by-id "time-display") :innerText (to-fixed time 3))
