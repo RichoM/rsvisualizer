@@ -154,7 +154,7 @@
     (b/on-click snapshot-copy 
                 #(let [str (pr-str (get-selected-strategy @state-atom))]
                    (b/show-modal (b/make-modal :header (list b/close-modal-btn)
-                                               :body [:div {:style "user-select: all;"} str]))))))
+                                               :body [:div.font-monospace {:style "user-select: all;"} str]))))))
 
 (defn update-selected-robot! [{:keys [selected-robot]}]
   (dotimes [idx 3]
