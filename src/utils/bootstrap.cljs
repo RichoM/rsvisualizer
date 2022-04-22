@@ -187,6 +187,13 @@
        (on-toast-hidden #(do (.remove html-toast))))
      result)))
 
+(defn show-toast-msg [msg & [icon]]
+  (-> (make-toast :header (list (when icon 
+                                  [:span.me-3 icon])
+                                [:strong.me-auto msg]
+                                close-toast-btn))
+      (show-toast)))
+
 (comment
   (hide-modals)
 
