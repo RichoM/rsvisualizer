@@ -74,12 +74,6 @@
                         (swap! state-atom assoc :cursor {:pixel pixel-coords
                                                          :world world-coords})))))))
 
-(defn initialize-previous-ball! [field {ball-texture :ball}]
-  (doto (pixi/make-sprite! ball-texture)
-    (oset! :alpha 0.5)
-    (pixi/set-position! [0 0])
-    (pixi/add-to! field)))
-
 (defn initialize-future-balls! [field {ball-texture :ball}]
   (mapv (fn [idx]
           (doto (pixi/make-sprite! ball-texture)
@@ -193,7 +187,6 @@
             app (pixi/make-application! (js/document.getElementById "canvas-panel"))
             textures (<! (load-textures!))
             field (initialize-field! state-atom app textures)
-            previous-ball (initialize-previous-ball! field textures)
             future-balls (initialize-future-balls! field textures)
             ball (initialize-ball! field textures)
             robots (initialize-robots! state-atom app field textures)
@@ -210,7 +203,6 @@
                  :targets targets
                  :rotators rotators
                  :ball ball
-                 :previous-ball previous-ball
                  :future-balls future-balls
                  :cursor cursor})
         (.addEventListener js/window "resize" resize-field)
@@ -223,7 +215,7 @@
     (:snapshot strategy)))
 
 (defn update-snapshot! [new-state]
-  (when-let [{:keys [ball previous-ball future-balls robots roles targets rotators]} @pixi]
+  (when-let [{:keys [ball future-balls robots roles targets rotators]} @pixi]
     (let [snapshot (get-selected-snapshot new-state)]
       (dotimes [idx 3]
         (oset! (nth robots idx) :tint
@@ -235,15 +227,10 @@
       (when-let [{:keys [robot]} snapshot]
         (when (or (nil? (-> new-state :selected-robot))
                   (= robot (-> new-state :selected-robot)))
-          (when-let [{:keys [x y stale-time previous future]} (:ball snapshot)]
+          (when-let [{:keys [x y stale-time]} (:ball snapshot)]
             (doto ball
               (oset! :tint (if (< stale-time 0.1) 0x00ff00 0xaaaaaa))
               (pixi/set-position! (world->pixel [x y])))
-            (if-let [{:keys [x y]} previous]
-              (doto previous-ball
-                (oset! :visible (-> new-state :settings :ball-prediction?))
-                (pixi/set-position! (world->pixel [x y])))
-              (oset! previous-ball :visible false))
             (doseq [[idx future-ball] (map-indexed vector future-balls)]
               (if-let [{:keys [x y]} (nth future idx nil)]
                 (doto future-ball
