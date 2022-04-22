@@ -222,14 +222,6 @@
     (:snapshot (h/get history selected-snapshot))
     (:snapshot strategy)))
 
-
-(comment
-  
-  (def new-state @rsvisualizer.main/state)
-  (:selected-snapshot new-state)
-  
-  )
-
 (defn update-snapshot! [new-state]
   (when-let [{:keys [ball previous-ball future-balls robots roles targets rotators]} @pixi]
     (let [snapshot (get-selected-snapshot new-state)]
