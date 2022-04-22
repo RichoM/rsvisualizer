@@ -84,8 +84,12 @@
        [:div.col]]
       [:div#field-panel
        [:div#canvas-panel]
-       [:div#bottom-bar.row.text-center.py-1
+       [:div#bottom-bar.row.text-center.py-1;.gx-1
         [:div.col]
+        [:div.col-auto
+         [:button#snapshot-print.btn.btn-sm.btn-outline-dark [:i.fa-solid.fa-terminal]]
+         [:span.mx-1]
+         [:button#snapshot-copy.btn.btn-sm.btn-outline-dark [:i.fa-regular.fa-copy]]]
         [:div.col-6
            [:input#snapshot-range.form-range {:type "range" :min 0 :max 0 :step 1}]]
         [:div.col-auto
@@ -104,6 +108,11 @@
 
 (defn get-element-by-id [id]
   (js/document.getElementById id))
+
+(defn get-selected-strategy [{:keys [selected-snapshot history strategy]}]
+  (if selected-snapshot
+    (h/get history selected-snapshot)
+    strategy))
 
 (defn initialize-main-ui! [state-atom]
   (doto js/document.body
@@ -134,8 +143,15 @@
                                        (dec (h/count (:history @state-atom))))))
   (let [snapshot-range (get-element-by-id "snapshot-range")]
     (b/on-input snapshot-range #(swap! state-atom assoc :selected-snapshot 
-                                       (int (oget snapshot-range :value))))))
-    
+                                       (int (oget snapshot-range :value)))))
+  (let [snapshot-print (get-element-by-id "snapshot-print")]
+    (b/on-click snapshot-print #(js/console.log (clj->js (get-selected-strategy @state-atom)))))
+  (let [snapshot-copy (get-element-by-id "snapshot-copy")]
+    (b/on-click snapshot-copy 
+                #(let [str (pr-str (get-selected-strategy @state-atom))]
+                   (b/show-modal (b/make-modal :header (list b/close-modal-btn)
+                                               :body [:div {:style "user-select: all;"} str]))))))
+
 (defn update-selected-robot! [{:keys [selected-robot]}]
   (dotimes [idx 3]
     (let [selected? (= idx selected-robot)
@@ -150,6 +166,10 @@
 (defn update-selected-snapshot! [{:keys [selected-snapshot history]}]
   (let [max (dec (h/count history))
         disabled? (h/empty? history)]
+    (doto (get-element-by-id "snapshot-print")
+      (oset! :disabled disabled?))
+    (doto (get-element-by-id "snapshot-copy")
+      (oset! :disabled disabled?))
     (doto (get-element-by-id "snapshot-range")
       (oset! :disabled disabled?)
       (oset! :max max)
@@ -172,14 +192,13 @@
 (defn to-fixed [n d]
   (if n (.toFixed n d) ""))
 
-(defn get-selected-snapshot
-  [{:keys [selected-snapshot history strategy]}]
-  (if selected-snapshot
-    (:snapshot (h/get history selected-snapshot))
-    (:snapshot strategy)))
+(comment
+  
+  (def new-state @rsvisualizer.main/state)
+  )
 
 (defn update-table-display! [new-state]
-  (when-let [{:keys [time robot] :as snapshot} (get-selected-snapshot new-state)]
+  (when-let [{:keys [time robot] :as snapshot} (-> new-state get-selected-strategy :snapshot)]
     (when (or (nil? (-> new-state :selected-robot))
               (= robot (-> new-state :selected-robot)))
       (oset! (get-element-by-id "time-display") :innerText (to-fixed time 3))
@@ -215,7 +234,6 @@
     (go (loop []
           (when-some [new-state (<! updates*)]
             (let [timeout (a/timeout 32)]
-              ;(js/console.log (clj->js new-state))
               (update-table-display! new-state)
               (update-selected-snapshot! new-state)
               (pui/update-snapshot! new-state)
