@@ -18,3 +18,6 @@
 
 (defn count [history]
   (-> history :values clj/count))
+
+(defn empty? [history]
+  (zero? (count history)))

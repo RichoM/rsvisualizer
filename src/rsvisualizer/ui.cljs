@@ -148,16 +148,26 @@
             (ocall! row :classList.remove "text-primary"))))))
 
 (defn update-selected-snapshot! [{:keys [selected-snapshot history]}]
-  (let [max (dec (h/count history))]
+  (let [max (dec (h/count history))
+        disabled? (h/empty? history)]
     (doto (get-element-by-id "snapshot-range")
+      (oset! :disabled disabled?)
       (oset! :max max)
       (oset! :value (or selected-snapshot max)))
-    (oset! (get-element-by-id "snapshot-play") :hidden (nil? selected-snapshot))
-    (oset! (get-element-by-id "snapshot-pause") :hidden (some? selected-snapshot))
-    (oset! (get-element-by-id "snapshot-previous") :disabled (and (some? selected-snapshot) 
-                                                                  (<= selected-snapshot 0)))
-    (oset! (get-element-by-id "snapshot-next") :disabled (or (nil? selected-snapshot)
-                                                             (>= selected-snapshot max)))))
+    (doto (get-element-by-id "snapshot-play")
+      (oset! :disabled disabled?)
+      (oset! :hidden (nil? selected-snapshot)))
+    (doto (get-element-by-id "snapshot-pause")
+      (oset! :disabled disabled?)
+      (oset! :hidden (some? selected-snapshot)))
+    (doto (get-element-by-id "snapshot-previous")
+      (oset! :disabled (or disabled?
+                           (and (some? selected-snapshot)
+                                (<= selected-snapshot 0)))))
+    (doto (get-element-by-id "snapshot-next")
+      (oset! :disabled (or disabled?
+                           (nil? selected-snapshot)
+                           (>= selected-snapshot max))))))
 
 (defn to-fixed [n d]
   (if n (.toFixed n d) ""))
