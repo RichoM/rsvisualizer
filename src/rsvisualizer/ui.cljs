@@ -84,7 +84,7 @@
        [:div.col]]
       [:div#field-panel
        [:div#canvas-panel]
-       [:div#bottom-bar.row.text-center.py-1;.gx-1
+       [:div#bottom-bar.row.text-center.py-1
         [:div.col]
         [:div.col-auto
          [:button#snapshot-print.btn.btn-sm.btn-outline-dark [:i.fa-solid.fa-terminal]]
@@ -145,12 +145,16 @@
     (b/on-input snapshot-range #(swap! state-atom assoc :selected-snapshot 
                                        (int (oget snapshot-range :value)))))
   (let [snapshot-print (get-element-by-id "snapshot-print")]
-    (b/on-click snapshot-print #(js/console.log (clj->js (get-selected-strategy @state-atom)))))
+    (b/on-click snapshot-print 
+                #(do 
+                   (b/show-toast-msg "Current snapshot printed to the console"
+                                     [:i.fa-solid.fa-terminal])
+                   (js/console.log (clj->js (get-selected-strategy @state-atom))))))
   (let [snapshot-copy (get-element-by-id "snapshot-copy")]
     (b/on-click snapshot-copy 
                 #(let [str (pr-str (get-selected-strategy @state-atom))]
                    (b/show-modal (b/make-modal :header (list b/close-modal-btn)
-                                               :body [:div {:style "user-select: all;"} str]))))))
+                                               :body [:div.font-monospace {:style "user-select: all;"} str]))))))
 
 (defn update-selected-robot! [{:keys [selected-robot]}]
   (dotimes [idx 3]
@@ -192,13 +196,8 @@
 (defn to-fixed [n d]
   (if n (.toFixed n d) ""))
 
-(comment
-  
-  (def new-state @rsvisualizer.main/state)
-  )
-
 (defn update-table-display! [new-state]
-  (when-let [{:keys [time robot] :as snapshot} (-> new-state get-selected-strategy :snapshot)]
+  (if-let [{:keys [time robot] :as snapshot} (-> new-state get-selected-strategy :snapshot)]
     (when (or (nil? (-> new-state :selected-robot))
               (= robot (-> new-state :selected-robot)))
       (oset! (get-element-by-id "time-display") :innerText (to-fixed time 3))
@@ -212,7 +211,12 @@
           (oset! (get-element-by-id (str "r" idx "-a"))
                  :innerText (if (-> new-state :settings :degrees?)
                               (str (to-fixed (/ a (/ Math/PI 180)) 3) "deg")
-                              (str (to-fixed a 3) "rad"))))))))
+                              (str (to-fixed a 3) "rad"))))))
+    (doseq [element-id ["time-display" "ball-x" "ball-y"
+                        "r0-x" "r0-y" "r0-a"
+                        "r1-x" "r1-y" "r1-a"
+                        "r2-x" "r2-y" "r2-a"]]
+      (oset! (get-element-by-id element-id) :innerText "?"))))
 
 (defn update-settings-panel! [{{:keys [degrees? ball-prediction?]} :settings}]
   (oset! (get-element-by-id "use-degrees")

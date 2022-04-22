@@ -13,13 +13,6 @@
 (defonce state (atom {}))
 (defonce ws (atom nil))
 
-(defn show-msg [msg & [icon]]
-  (-> (b/make-toast :header (list (when icon icon)
-                                  [:strong.me-auto msg]
-                                  [:button.btn-close {:type "button" :data-bs-dismiss "toast" :aria-label "Close"}]))
-      (b/show-toast))
-  (print msg))
-
 (declare connect-to-server!)
 
 (defn ask-address [default]
@@ -28,7 +21,7 @@
 (defn show-connection-dialog [default]
   (go (let [address (<! (ask-address default))]
         (if (empty? address)
-          (show-msg "Staying disconnected. Reload page to retry...")
+          (b/show-toast-msg "Staying disconnected. Reload page to retry...")
           (<! (connect-to-server! address))))))
 
 (defn disconnect-from-server! []
@@ -37,22 +30,22 @@
 
 (defn try-to-connect-ws!
   [address]
-  (go (show-msg (str "Connecting to " address))
+  (go (b/show-toast-msg (str "Connecting to " address))
       (if-let [socket (<! (ws/try-connect! (str address "/updates")))]
-        (do (show-msg "Connection successful!" [:i.fa-solid.fa-circle-check.me-3])
+        (do (b/show-toast-msg "Connection successful!" [:i.fa-solid.fa-circle-check])
             (oset! js/localStorage "!rsvisualizer-address" address)
             (reset! ws socket)
             (doto socket
               (oset! :onclose
                      #(go (loop [retry 1]
                             (if (> retry 10)
-                              (do (show-msg "Too many retries. Giving up...")
+                              (do (b/show-toast-msg "Too many retries. Giving up...")
                                   (<! (a/timeout 1000))
                                   (<! (show-connection-dialog address)))
                               (if-not (= socket @ws)
                                 (print "OLD SOCKET. BYE")
                                 (when-not (<! (try-to-connect-ws! address))
-                                  (show-msg (u/format "Retrying in 1s (retry: %1)" retry))
+                                  (b/show-toast-msg (u/format "Retrying in 1s (retry: %1)" retry))
                                   (<! (a/timeout 1000))
                                   (recur (inc retry))))))))
               (oset! :onmessage
@@ -66,7 +59,7 @@
                                             (-> state
                                                 (assoc :strategy new-strategy)
                                                 (update :history h/append data clear?))))))))))
-        (do (show-msg "Connection failed" [:i.fa-solid.fa-triangle-exclamation.me-3])
+        (do (b/show-toast-msg "Connection failed" [:i.fa-solid.fa-triangle-exclamation])
             nil))))
 
 (defn connect-to-server!
