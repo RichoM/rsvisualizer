@@ -43,7 +43,7 @@
             (oset! js/localStorage "!rsvisualizer-address" address)
             (reset! ws socket)
             (doto socket
-              (oset! :onclose 
+              (oset! :onclose
                      #(go (loop [retry 1]
                             (if (> retry 10)
                               (do (show-msg "Too many retries. Giving up...")
@@ -57,11 +57,15 @@
                                   (recur (inc retry))))))))
               (oset! :onmessage
                      (fn [msg] (let [data (oget msg :data)
-                                     strategy (js->clj (js/JSON.parse data)
-                                                       :keywordize-keys true)]
-                                 (swap! state #(-> %
-                                                   (assoc :strategy strategy)
-                                                   (update :history h/append data))))))))
+                                     new-strategy (js->clj (js/JSON.parse data)
+                                                           :keywordize-keys true)]
+                                 (swap! state
+                                        (fn [{previous-strategy :strategy, :as state}]
+                                          (let [clear? (< (-> new-strategy :snapshot :time)
+                                                          (-> previous-strategy :snapshot :time))]
+                                            (-> state
+                                                (assoc :strategy new-strategy)
+                                                (update :history h/append data clear?))))))))))
         (do (show-msg "Connection failed" [:i.fa-solid.fa-triangle-exclamation.me-3])
             nil))))
 

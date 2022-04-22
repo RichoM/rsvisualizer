@@ -1,10 +1,10 @@
 (ns rsvisualizer.history
-  (:refer-clojure :exclude [count get])
+  (:refer-clojure :exclude [get count empty?])
   (:require [cljs.core :as clj]))
 
-(defn append [history data]
+(defn append [history data & [clear?]]
   (let [string (js/LZString.compress data)]
-    (if history
+    (if (and history (not clear?))
       (update history :values conj string)
       {:values [string]})))
 
