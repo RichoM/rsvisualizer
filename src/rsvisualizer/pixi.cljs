@@ -105,8 +105,10 @@
                            (let [label (pixi/make-label! idx label-style)]
                              (pixi/add-child! field label)
                              (pixi/add-ticker! app
-                                               #(pixi/set-position! label [(oget robot :x)
-                                                                           (oget robot :y)]))))]
+                                               #(doto label
+                                                  (oset! :visible (oget robot :visible))
+                                                  (pixi/set-position! [(oget robot :x)
+                                                                       (oget robot :y)])))))]
     (mapv (fn [idx]
             (doto (pixi/make-sprite! robot-texture)
               (oset! :tint (get-in robot-colors [nil :regular]))
@@ -229,11 +231,12 @@
                      flipped? (-> snapshot :robots (get idx) :flipped?)]
                  (get-in robot-colors [(if flipped? nil color)
                                        (if selected? :highlight :regular)]))))
-      (when-let [{:keys [robot]} snapshot]
+      (if-let [{:keys [robot]} snapshot]
         (when (or (nil? (-> new-state :selected-robot))
                   (= robot (-> new-state :selected-robot)))
           (when-let [{:keys [x y stale-time]} (:ball snapshot)]
             (doto ball
+              (oset! :visible true)
               (oset! :tint (if (< stale-time 0.1) 0x00ff00 0xaaaaaa))
               (pixi/set-position! (world->pixel [x y])))
             (doseq [[idx future-ball] (map-indexed vector future-balls)]
@@ -246,25 +249,31 @@
                 (oset! future-ball :visible false))))
           (doseq [[idx {:keys [x y a action role wheels]}]
                   (map-indexed vector (:robots snapshot))]
-            (doto (nth robots idx)
-              (pixi/set-position! (world->pixel [x y]))
-              (pixi/set-rotation! (* -1 a)))
-            (if-let [{tx :x ty :y} (:target action)]
-              (doto (nth targets idx)
-                (oset! :visible true)
-                (pixi/set-position! (world->pixel [tx ty])))
-              (oset! (nth targets idx) :visible false))
-            (let [angle (:angle action)
-                  opposite-angle #(mod (+ % Math/PI) (* Math/PI 2))]
-              (if (and angle
-                       (> (Math/abs (- angle a)) 0.02)
-                       (> (Math/abs (- angle (opposite-angle a))) 0.02))
-                (doto (nth rotators idx)
-                  (oset! :visible true)
-                  (oset! :scale.x (let [[vl vr] wheels]
-                                    (if (< vl vr) -1 1))))
-                (oset! (nth rotators idx) :visible false)))
-            (oset! (nth roles idx) :text (get role :name ""))))))))
+            (let [visible? (and x y a)]
+              (doto (nth robots idx)
+                (oset! :visible visible?)
+                (pixi/set-position! (world->pixel [x y]))
+                (pixi/set-rotation! (* -1 a)))
+              (if-let [{tx :x ty :y} (:target action)]
+                (doto (nth targets idx)
+                  (oset! :visible visible?)
+                  (pixi/set-position! (world->pixel [tx ty])))
+                (oset! (nth targets idx) :visible false))
+              (let [angle (:angle action)
+                    opposite-angle #(mod (+ % Math/PI) (* Math/PI 2))]
+                (if (and angle
+                         (> (Math/abs (- angle a)) 0.02)
+                         (> (Math/abs (- angle (opposite-angle a))) 0.02))
+                  (doto (nth rotators idx)
+                    (oset! :visible visible?)
+                    (oset! :scale.x (let [[vl vr] wheels]
+                                      (if (< vl vr) -1 1))))
+                  (oset! (nth rotators idx) :visible false)))
+              (doto (nth roles idx)
+                (oset! :visible visible?)
+                (oset! :text (get role :name ""))))))
+        (doseq [pixi-obj (flatten [ball future-balls robots roles targets rotators])]
+          (oset! pixi-obj :visible false))))))
 
 (defn terminate! []
   (try
@@ -277,6 +286,9 @@
 (comment
 
   (def state-atom rsvisualizer.main/state)
+  (def new-state @state-atom)
+  (-> @state-atom :selected-snapshot)
+  (-> @state-atom :history)
   (-> @state-atom :strategy :snapshot :color)
   (-> @state-atom :selected-robot)
   (swap! state-atom assoc :selected-robot nil)
