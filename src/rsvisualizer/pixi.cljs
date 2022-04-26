@@ -29,6 +29,27 @@
     [(+ x (* vx t))
      (+ y (* vy t))]))
 
+(defn transform-coordinate-system [strategy better-coord-system?]
+  (if better-coord-system?
+    strategy
+    (let [transform-point (fn [point]
+                            (when point
+                              (assoc point
+                                     :x (:y point)
+                                     :y (* -1 (:x point)))))]
+      (-> strategy
+          (update-in [:snapshot :robots] #(mapv transform-point %))
+          (update-in [:snapshot :ball] transform-point)))))
+
+(defn get-selected-snapshot
+  [{:keys [selected-snapshot history strategy settings]}]
+  (-> (if selected-snapshot
+        (h/get history selected-snapshot)
+        strategy)
+      (transform-coordinate-system (:better-coord-system? settings))
+      :snapshot))
+
+
 (defn resize-field []
   (when-let [{:keys [html app field]} @pixi]
     (doto html
@@ -76,8 +97,9 @@
               (fn [e] (let [position (ocall! e :data.getLocalPosition field)
                             pixel-coords [(oget position :x) (oget position :y)]
                             world-coords (pixel->world pixel-coords)]
-                        (swap! state-atom assoc :cursor {:pixel pixel-coords
-                                                         :world world-coords})))))))
+                        (swap! state-atom assoc :cursor
+                               {:pixel pixel-coords
+                                :world world-coords})))))))
 
 (defn initialize-future-balls! [field {ball-texture :ball}]
   (mapv (fn [idx]
@@ -183,9 +205,12 @@
     (pixi/add-child! field label)
     (pixi/add-ticker! app #(when-let [{[wx wy] :world [px py] :pixel}
                                       (-> @state-atom :cursor)]
-                             (oset! label :text (u/format "[%1 %2]"
-                                                          (.toFixed wx 3)
-                                                          (.toFixed wy 3)))
+                             (let [[x y] (if (-> @state-atom :settings :better-coord-system?)
+                                           [wx wy]
+                                           [(* -1 wy) wx])]
+                               (oset! label :text (u/format "[%1 %2]"
+                                                            (.toFixed x 3)
+                                                            (.toFixed y 3))))
                              (pixi/set-position! label [(+ px 12) py])))
     label))
 
@@ -215,19 +240,15 @@
         (.addEventListener js/window "resize" resize-field)
         (resize-field))))
 
-(defn get-selected-snapshot 
-  [{:keys [selected-snapshot history strategy]}]
-  (if selected-snapshot
-    (:snapshot (h/get history selected-snapshot))
-    (:snapshot strategy)))
-
 (defn find-latest-robot-data 
-  [{:keys [selected-snapshot history]} robot-idx]
+  [{:keys [selected-snapshot history settings]} robot-idx]
   (loop [i (or selected-snapshot (dec (h/count history)))]
     (when (pos? i)
-      (if-let [robot (get-in (h/get history i) [:snapshot :robots robot-idx])]
-        robot
-        (recur (dec i))))))
+      (let [strategy (transform-coordinate-system (h/get history i)
+                                                  (:better-coord-system? settings))]
+        (if-let [robot (get-in strategy [:snapshot :robots robot-idx])]
+          robot
+          (recur (dec i)))))))
 
 (defn update-robot! [idx robots targets rotators roles robot-data ghost?]
   (let [{:keys [x y a action role wheels]} robot-data
@@ -290,8 +311,9 @@
                                robot-data)]
               (update-robot! idx robots targets rotators roles
                              robot-data ghost?))))
-        (doseq [pixi-obj (flatten [ball future-balls robots roles targets rotators])]
-          (oset! pixi-obj :visible false))))))
+        (when (pos? (h/count (:history new-state)))
+          (doseq [pixi-obj (flatten [ball future-balls robots roles targets rotators])]
+            (oset! pixi-obj :visible false)))))))
 
 (defn terminate! []
   (try

@@ -42,6 +42,9 @@
       [:div.form-check.form-switch.text-center.mx-3
        [:input#ghost-robots.form-check-input {:type "checkbox" :role "switch" :checked false}]
        [:label.form-check-.ebal {:for "ghost-robots"} "Ghost robots?"]]
+      [:div.form-check.form-switch.text-center.mx-3
+       [:input#better-coord-system.form-check-input {:type "checkbox" :role "switch" :checked false}]
+       [:label.form-check-.ebal {:for "better-coord-system"} "Better coord. system?"]]
       [:div#table-display.position-absolute.bottom-0
        [:div.col
         [:div.row
@@ -136,6 +139,9 @@
   (let [ghost-robots (get-element-by-id "ghost-robots")]
     (b/on-click ghost-robots #(swap! state-atom assoc-in [:settings :ghost-robots?]
                                      (oget ghost-robots :checked))))
+  (let [better-coord-system (get-element-by-id "better-coord-system")]
+    (b/on-click better-coord-system #(swap! state-atom assoc-in [:settings :better-coord-system?]
+                                     (oget better-coord-system :checked))))
   (let [snapshot-previous (get-element-by-id "snapshot-previous")]
     (b/on-click snapshot-previous #(swap! state-atom update :selected-snapshot
                                           (fn [n] (dec (or n (h/count (:history @state-atom))))))))
@@ -225,13 +231,15 @@
       (oset! (get-element-by-id element-id) :innerText "?"))))
 
 (defn update-settings-panel!
-  [{{:keys [degrees? ball-prediction? ghost-robots?]} :settings}]
+  [{{:keys [degrees? ball-prediction? ghost-robots? better-coord-system?]} :settings}]
   (oset! (get-element-by-id "use-degrees")
          :checked degrees?)
   (oset! (get-element-by-id "ball-prediction")
          :checked ball-prediction?)
   (oset! (get-element-by-id "ghost-robots")
-         :checked ghost-robots?))
+         :checked ghost-robots?)
+  (oset! (get-element-by-id "better-coord-system")
+         :checked better-coord-system?))
 
 (defn start-update-loop! [state-atom]
   (let [updates* (reset! updates (a/chan (a/sliding-buffer 1)))]
