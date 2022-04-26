@@ -221,6 +221,41 @@
     (:snapshot (h/get history selected-snapshot))
     (:snapshot strategy)))
 
+(defn find-latest-robot-data 
+  [{:keys [selected-snapshot history]} robot-idx]
+  (loop [i (or selected-snapshot (dec (h/count history)))]
+    (when (pos? i)
+      (if-let [robot (get-in (h/get history i) [:snapshot :robots robot-idx])]
+        robot
+        (recur (dec i))))))
+
+(defn update-robot! [idx robots targets rotators roles robot-data ghost?]
+  (let [{:keys [x y a action role wheels]} robot-data
+        visible? (and x y a)]
+    (doto (nth robots idx)
+      (oset! :visible visible?)
+      (oset! :alpha (if ghost? 0.5 1))
+      (pixi/set-position! (world->pixel [x y]))
+      (pixi/set-rotation! (* -1 a)))
+    (if-let [{tx :x ty :y} (:target action)]
+      (doto (nth targets idx)
+        (oset! :visible visible?)
+        (pixi/set-position! (world->pixel [tx ty])))
+      (oset! (nth targets idx) :visible false))
+    (let [angle (:angle action)
+          opposite-angle #(mod (+ % Math/PI) (* Math/PI 2))]
+      (if (and angle
+               (> (Math/abs (- angle a)) 0.02)
+               (> (Math/abs (- angle (opposite-angle a))) 0.02))
+        (doto (nth rotators idx)
+          (oset! :visible visible?)
+          (oset! :scale.x (let [[vl vr] wheels]
+                            (if (< vl vr) -1 1))))
+        (oset! (nth rotators idx) :visible false)))
+    (doto (nth roles idx)
+      (oset! :visible visible?)
+      (oset! :text (get role :name "")))))
+
 (defn update-snapshot! [new-state]
   (when-let [{:keys [ball future-balls robots roles targets rotators]} @pixi]
     (let [snapshot (get-selected-snapshot new-state)]
@@ -247,31 +282,14 @@
                                        (predict-movement (:ball snapshot)
                                                          (* 0.128 (inc idx))))))
                 (oset! future-ball :visible false))))
-          (doseq [[idx {:keys [x y a action role wheels]}]
-                  (map-indexed vector (:robots snapshot))]
-            (let [visible? (and x y a)]
-              (doto (nth robots idx)
-                (oset! :visible visible?)
-                (pixi/set-position! (world->pixel [x y]))
-                (pixi/set-rotation! (* -1 a)))
-              (if-let [{tx :x ty :y} (:target action)]
-                (doto (nth targets idx)
-                  (oset! :visible visible?)
-                  (pixi/set-position! (world->pixel [tx ty])))
-                (oset! (nth targets idx) :visible false))
-              (let [angle (:angle action)
-                    opposite-angle #(mod (+ % Math/PI) (* Math/PI 2))]
-                (if (and angle
-                         (> (Math/abs (- angle a)) 0.02)
-                         (> (Math/abs (- angle (opposite-angle a))) 0.02))
-                  (doto (nth rotators idx)
-                    (oset! :visible visible?)
-                    (oset! :scale.x (let [[vl vr] wheels]
-                                      (if (< vl vr) -1 1))))
-                  (oset! (nth rotators idx) :visible false)))
-              (doto (nth roles idx)
-                (oset! :visible visible?)
-                (oset! :text (get role :name ""))))))
+          (doseq [[idx robot-data] (map-indexed vector (:robots snapshot))]
+            (let [ghost? (and (nil? robot-data)
+                              (-> new-state :settings :ghost-robots?))
+                  robot-data (if ghost?
+                               (find-latest-robot-data new-state idx)
+                               robot-data)]
+              (update-robot! idx robots targets rotators roles
+                             robot-data ghost?))))
         (doseq [pixi-obj (flatten [ball future-balls robots roles targets rotators])]
           (oset! pixi-obj :visible false))))))
 

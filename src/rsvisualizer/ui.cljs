@@ -39,6 +39,9 @@
       [:div.form-check.form-switch.text-center.mx-3
        [:input#use-degrees.form-check-input {:type "checkbox" :role "switch" :checked false}]
        [:label.form-check-.ebal {:for "use-degrees"} "Use degrees?"]]
+      [:div.form-check.form-switch.text-center.mx-3
+       [:input#ghost-robots.form-check-input {:type "checkbox" :role "switch" :checked false}]
+       [:label.form-check-.ebal {:for "ghost-robots"} "Ghost robots?"]]
       [:div#table-display.position-absolute.bottom-0
        [:div.col
         [:div.row
@@ -130,6 +133,9 @@
   (let [ball-prediction (get-element-by-id "ball-prediction")]
     (b/on-click ball-prediction #(swap! state-atom assoc-in [:settings :ball-prediction?]
                                         (oget ball-prediction :checked))))
+  (let [ghost-robots (get-element-by-id "ghost-robots")]
+    (b/on-click ghost-robots #(swap! state-atom assoc-in [:settings :ghost-robots?]
+                                     (oget ghost-robots :checked))))
   (let [snapshot-previous (get-element-by-id "snapshot-previous")]
     (b/on-click snapshot-previous #(swap! state-atom update :selected-snapshot
                                           (fn [n] (dec (or n (h/count (:history @state-atom))))))))
@@ -139,19 +145,19 @@
     (oset! snapshot-play :hidden true)
     (b/on-click snapshot-play #(swap! state-atom assoc :selected-snapshot nil)))
   (let [snapshot-pause (get-element-by-id "snapshot-pause")]
-    (b/on-click snapshot-pause #(swap! state-atom assoc :selected-snapshot 
+    (b/on-click snapshot-pause #(swap! state-atom assoc :selected-snapshot
                                        (dec (h/count (:history @state-atom))))))
   (let [snapshot-range (get-element-by-id "snapshot-range")]
-    (b/on-input snapshot-range #(swap! state-atom assoc :selected-snapshot 
+    (b/on-input snapshot-range #(swap! state-atom assoc :selected-snapshot
                                        (int (oget snapshot-range :value)))))
   (let [snapshot-print (get-element-by-id "snapshot-print")]
-    (b/on-click snapshot-print 
-                #(do 
+    (b/on-click snapshot-print
+                #(do
                    (b/show-toast-msg "Current snapshot printed to the console"
                                      [:i.fa-solid.fa-terminal])
                    (js/console.log (clj->js (get-selected-strategy @state-atom))))))
   (let [snapshot-copy (get-element-by-id "snapshot-copy")]
-    (b/on-click snapshot-copy 
+    (b/on-click snapshot-copy
                 #(let [str (pr-str (get-selected-strategy @state-atom))]
                    (b/show-modal (b/make-modal :header (list b/close-modal-btn)
                                                :body [:div.font-monospace {:style "user-select: all;"} str]))))))
@@ -218,11 +224,14 @@
                         "r2-x" "r2-y" "r2-a"]]
       (oset! (get-element-by-id element-id) :innerText "?"))))
 
-(defn update-settings-panel! [{{:keys [degrees? ball-prediction?]} :settings}]
+(defn update-settings-panel!
+  [{{:keys [degrees? ball-prediction? ghost-robots?]} :settings}]
   (oset! (get-element-by-id "use-degrees")
          :checked degrees?)
   (oset! (get-element-by-id "ball-prediction")
-         :checked ball-prediction?))
+         :checked ball-prediction?)
+  (oset! (get-element-by-id "ghost-robots")
+         :checked ghost-robots?))
 
 (defn start-update-loop! [state-atom]
   (let [updates* (reset! updates (a/chan (a/sliding-buffer 1)))]
